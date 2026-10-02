@@ -1,0 +1,39 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# paseo finish: let s6 restart the daemon, but halt the container after repeated
+# crashes so the Supervisor sees the add-on stop (and its watchdog/health
+# handling can take over).
+# ==============================================================================
+readonly exit_code_container=$(</run/s6-linux-init-container-results/exitcode)
+readonly exit_code_service="${1}"
+readonly exit_code_signal="${2}"
+readonly crash_log=/run/paseo-ha/crashes
+readonly max_crashes="${PASEO_HA_MAX_CRASHES:-5}"
+readonly window_s="${PASEO_HA_CRASH_WINDOW:-300}"
+
+bashio::log.info "Service paseo exited with code ${exit_code_service} (by signal ${exit_code_signal})"
+
+# Orderly stop by s6 (container shutdown or service down): nothing to do.
+if [[ "${exit_code_service}" -eq 256 && "${exit_code_signal}" -eq 15 ]]; then
+  exit 0
+fi
+
+mkdir -p /run/paseo-ha
+now=$(date +%s)
+echo "${now}" >> "${crash_log}"
+recent=$(awk -v now="${now}" -v w="${window_s}" '$1 >= now - w' "${crash_log}" | wc -l)
+
+if [[ "${recent}" -ge "${max_crashes}" ]]; then
+  bashio::log.error "Paseo daemon crashed ${recent} times within ${window_s}s; stopping the add-on"
+  if [[ "${exit_code_service}" -eq 256 ]]; then
+    if [[ "${exit_code_container}" -eq 0 ]]; then
+      echo $((128 + exit_code_signal)) > /run/s6-linux-init-container-results/exitcode
+    fi
+  elif [[ "${exit_code_container}" -eq 0 ]]; then
+    echo "${exit_code_service}" > /run/s6-linux-init-container-results/exitcode
+  fi
+  exec /run/s6/basedir/bin/halt
+fi
+
+bashio::log.warning "Restarting Paseo daemon (${recent}/${max_crashes} crashes within ${window_s}s)"

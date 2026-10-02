@@ -11,21 +11,21 @@
 
 ## 2. Image build (Node, Paseo, Pi)
 
-- [ ] 2.1 Write `paseo/Dockerfile`: `ARG BUILD_FROM`, install `nodejs npm nginx git openssh-client bash curl` plus build-stage `build-base python3 linux-headers`, set `ONNXRUNTIME_NODE_INSTALL=skip`, then `npm install -g @getpaseo/cli@${PASEO_VERSION}` and verify `node --version` ≥ 22.19 and `paseo --version` print the pinned version in a local amd64 build
-- [ ] 2.2 Add `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_VERSION}` and verify `pi --version` runs inside the built image
+- [x] 2.1 Write `paseo/Dockerfile`: `ARG BUILD_FROM`, install `nodejs npm nginx git openssh-client bash curl` plus build-stage `build-base python3 linux-headers`, set `ONNXRUNTIME_NODE_INSTALL=skip`, then `npm install -g @getpaseo/cli@${PASEO_VERSION}` and verify `node --version` ≥ 22.19 and `paseo --version` print the pinned version in a local amd64 build
+- [x] 2.2 Add `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_VERSION}` and verify `pi --version` runs inside the built image
 - [ ] 2.3 Build for `aarch64` and `armv7` via `home-assistant/builder --test` (QEMU) and check that `node -e "require('node-pty')"` works in each image. If musl/armv7 fails, apply the Debian-base fallback from design D1 and record the outcome in design.md
 - [ ] 2.4 Add a Docker `HEALTHCHECK` against `http://127.0.0.1:6767/api/health` and verify `docker inspect` reports healthy after start
 - [ ] 2.5 Install the pinned per-arch static `ha` CLI binary (`ARG HA_CLI_VERSION`) and verify `ha --version` runs in each arch image
 
 ## 3. Runtime: init, daemon service, persistence
 
-- [ ] 3.1 Add the s6 `init-paseo` oneshot. It reads options with bashio, exports `HOME=/data/home`, `PASEO_HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR` and `XDG_*` under `/data/home`, creates the workspace dir if missing (default `/homeassistant`), and writes the daemon env file. Verify with a fake `/data/options.json` that the directories exist after start
-- [ ] 3.2 Export `env_vars` option entries into the daemon environment while logging names only, and verify with `grep` on the add-on log that a test secret value never appears while `printenv` in a Paseo terminal shows it
-- [ ] 3.3 Add the s6 `paseo` longrun that runs the daemon with `PASEO_WEB_UI_ENABLED=true`, `PASEO_LISTEN=127.0.0.1:6767` (default) and text logs to stdout, plus a `finish` script that halts the container after repeated crashes. Verify daemon logs appear in `docker logs` and that `kill`ing the daemon causes a restart or container exit
+- [x] 3.1 Add the s6 `init-paseo` oneshot. It reads options with bashio, exports `HOME=/data/home`, `PASEO_HOME`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `PI_CODING_AGENT_DIR` and `XDG_*` under `/data/home`, creates the workspace dir if missing (default `/homeassistant`), and writes the daemon env file. Verify with a fake `/data/options.json` that the directories exist after start
+- [x] 3.2 Export `env_vars` option entries into the daemon environment while logging names only, and verify with `grep` on the add-on log that a test secret value never appears while `printenv` in a Paseo terminal shows it
+- [x] 3.3 Add the s6 `paseo` longrun that runs the daemon with `PASEO_WEB_UI_ENABLED=true`, `PASEO_LISTEN=127.0.0.1:6767` (default) and text logs to stdout, plus a `finish` script that halts the container after repeated crashes. Verify daemon logs appear in `docker logs` and that `kill`ing the daemon causes a restart or container exit
 - [ ] 3.4 Verify persistence: create a Paseo project and log into Pi, restart the container with the same `/data` volume, and confirm the project and Pi auth remain
 - [ ] 3.5 Map the Paseo options per design D7a. Always export `PASEO_DICTATION_ENABLED`/`PASEO_VOICE_MODE_ENABLED` (default `false`), the speech provider vars, `PASEO_LOG_CONSOLE_LEVEL` and `PASEO_LOG_CONSOLE_FORMAT=pretty`. Verify with defaults that no `models/local-speech` download happens and the dictation control is hidden, and that with `dictation: true` the control appears
-- [ ] 3.6 Apply `worktrees_root` via `paseo daemon config set/unset worktrees.root --home $PASEO_HOME` before the daemon starts (mkdir if set). Verify a new worktree lands in `/share/<path>` when set and under `/data/home/.paseo/worktrees` when unset
-- [ ] 3.7 Apply `relay`: unset means no env var, set means `PASEO_RELAY_ENABLED=<value>`. Verify that with it unset, enabling relay from Paseo's Pair device screen survives a restart, and that with `relay: false` no relay connection is logged
+- [x] 3.6 Apply `worktrees_root` via `paseo daemon config set/unset worktrees.root --home $PASEO_HOME` before the daemon starts (mkdir if set). Verify a new worktree lands in `/share/<path>` when set and under `/data/home/.paseo/worktrees` when unset
+- [x] 3.7 Apply `relay`: unset means no env var, set means `PASEO_RELAY_ENABLED=<value>`. Verify that with it unset, enabling relay from Paseo's Pair device screen survives a restart, and that with `relay: false` no relay connection is logged
 - [ ] 3.8 Verify that runtime settings stay editable: toggle auto-archive-after-merge and browser tools in Paseo's Settings, restart the add-on, and confirm the values persist and the UI shows no overridden paths
 - [ ] 3.9 Enable local dictation on an armv7 (or musl) build and verify the daemon still starts and the log explains when local speech is unavailable
 

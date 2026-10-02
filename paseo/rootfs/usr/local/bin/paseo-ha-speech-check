@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Exit 0 if Paseo's local speech engine (sherpa-onnx-node) can be loaded.
+cd /opt/node/lib/node_modules/@getpaseo/cli || exit 1
+exec node -e 'require("sherpa-onnx-node")'

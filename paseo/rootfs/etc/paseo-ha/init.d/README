@@ -1,0 +1,1 @@
+# Drop-in init hooks (*.sh), run in lexical order by init-paseo. See /usr/local/lib/paseo-ha/common.sh.

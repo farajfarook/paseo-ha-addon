@@ -1,0 +1,33 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# paseo: run the Paseo daemon in the foreground (logs go to stdout, i.e. the
+# add-on log). Readiness (fd 3) is signalled once /api/health answers, so
+# dependants (nginx, bootstrap) start only after the daemon is up.
+# ==============================================================================
+# shellcheck source=/usr/local/lib/paseo-ha/common.sh
+source /usr/local/lib/paseo-ha/common.sh
+ph_load_env
+
+cd "${PASEO_HA_WORKSPACE:-/homeassistant}" 2>/dev/null || cd "${HOME}" || exit 1
+# A previous daemon whose supervisor was killed may still hold the pid lock
+# (then `daemon run` would exit at once with "already running"). We are the
+# only supervisor in this container, so stop any leftover instance first.
+if paseo daemon status --home "${PASEO_HOME}" --json 2>/dev/null | jq -e '.localDaemon == "running"' >/dev/null 2>&1; then
+  ph_log_warn "Stopping leftover Paseo daemon instance"
+  paseo daemon stop --home "${PASEO_HOME}" --force --timeout 15 >/dev/null 2>&1 || true
+fi
+pkill -9 -f '@getpaseo/server/dist/(scripts/supervisor-entrypoint|server/daemon-worker)' 2>/dev/null || true
+
+ph_log_info "Starting Paseo daemon on ${PASEO_LISTEN}"
+# Readiness notifier: report "ready" on fd 3 once /api/health answers (max 10 min).
+(
+  for _ in $(seq 1 600); do
+    if curl -fs -o /dev/null --max-time 2 "$(ph_daemon_url)/api/health"; then
+      echo >&3
+      exit 0
+    fi
+    sleep 1
+  done
+) &
+exec paseo daemon run --home "${PASEO_HOME}"
