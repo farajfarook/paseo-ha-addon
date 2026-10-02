@@ -46,6 +46,10 @@ paseo/
 - Implementation note (group 3, amd64 Alpine): `node-pty` loads from its bundled `linux-x64` prebuild. `sherpa-onnx-node`'s prebuilt `sherpa-onnx-linux-x64` is glibc-linked (`ld-linux-x86-64.so.2` missing), so **local speech is unavailable on the Alpine images**. As required, the daemon still starts, and `init-paseo` logs a hint to use `speech_provider: openai`. Whether to switch to the Debian base for local speech is decided in task 2.3.
 - Native modules: install `build-base python3 linux-headers` in a build stage so `node-pty` can compile from source on musl/armv7. Set `ONNXRUNTIME_NODE_INSTALL=skip`. If `sherpa-onnx-node` has no binary for the platform, voice features degrade but the daemon must still start. Treat this as an acceptance check per arch.
 
+- Implementation note (task 2.3): the `node-pty@1.2.0-beta.15` prebuilds are glibc-linked, and there is no `linux-arm` prebuild. The aarch64 build failed with "Cannot find module ./prebuilds/linux-arm64/pty.node". The build stage therefore deletes `node_modules/node-pty/prebuilds` and runs `npm rebuild node-pty`, which compiles it with node-gyp (`build-base python3 linux-headers`) on every arch. It then checks `require('node-pty')`, so a broken node-pty fails the build. `@getpaseo/cli` and node-pty work on musl for amd64, aarch64 and armv7, so the **Debian-base fallback was not applied**. The runtime stage has no toolchain. Image sizes (content/disk): amd64 359 MB/1.53 GB, aarch64 361 MB/1.54 GB, armv7 244 MB/1.11 GB.
+- The base images differ: `armv7-base:latest` is Alpine 3.22.2 with nodejs 22.23.2 (≥ 22.19). amd64/aarch64 are Alpine 3.24.1 with nodejs 24.18.1. Under QEMU, aarch64 reports healthy after about 60 s and armv7 after about 90 s. This was verified with `docker buildx build --platform linux/arm64|linux/arm/v7 --build-arg BUILD_FROM=… --build-arg BUILD_ARCH=… --load` in place of `home-assistant/builder --test`; CI covers the real builder (8.2).
+- Task 2.4: `HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 CMD curl -fsS --max-time 8 http://127.0.0.1:6767/api/health`.
+
 ### D2. Pinned Paseo version
 - `Dockerfile` `ARG PASEO_VERSION=0.10.3` → `npm install -g @getpaseo/cli@${PASEO_VERSION}`. The same version goes in `build.yaml` `args`.
 - Add-on `version` = Paseo version, plus an add-on revision suffix when only the add-on changes (e.g. `0.10.3-1`). The CHANGELOG names the Paseo version.
@@ -133,6 +137,13 @@ Paseo has three configuration layers: defaults, then `$PASEO_HOME/config.json`, 
 - `home-assistant/builder` action in `--test` mode for `aarch64`, `amd64` and `armv7` (matrix, QEMU) on pull requests and pushes. It does not push images.
 - A smoke-test job on amd64: run the built image with a fake `/data/options.json`, start nginx with a stub `X-Ingress-Path`, then assert that `/api/health` is 200 through nginx, that `index.html` contains rewritten `/_expo/` paths and the shim, and that a WebSocket upgrade to `<prefix>/ws` succeeds.
 
+- **Implementation note (tasks 8.1–8.4):**
+  - **Builder:** the legacy `home-assistant/builder` action (`--test`/`--{arch}`/`--docker-hub` flags) is deprecated as of its last release, 2026.02.1. It prints a deprecation warning and will be removed. CI uses `home-assistant/builder/actions/build-image@2026.09.0` instead, which runs `docker/build-push-action` on the runner's own architecture: amd64 on `ubuntu-latest`, aarch64 on `ubuntu-24.04-arm`.
+  - **Build args:** that action ignores `build.yaml` and has no platform input. `.github/scripts/build-args.sh <arch>` therefore reads `build_from`, `args` and `labels` from `paseo/build.yaml` and passes them as build-args and labels (BUILD_FROM, BUILD_ARCH, PASEO_VERSION, PI_VERSION, HA_CLI_*). `build.yaml` stays the single source of truth.
+  - **armv7:** `ubuntu-latest` with `docker/setup-qemu-action` and `DOCKER_DEFAULT_PLATFORM=linux/arm/v7`. Buildx honours this (verified locally: image `linux/arm/v7`, `uname -m` = `armv7l`). Every job checks the image platform after the build. `prepare-multi-arch-matrix` isn't used because it only accepts amd64/aarch64.
+  - **Modes:** test builds use `push: false`. The amd64 smoke job runs `paseo/tests/smoke/run.sh`: 172.30.32.0/23 network, add-on at 172.30.33.10, ingress client at 172.30.32.2, denied client at 172.30.32.99. The WebSocket check expects 101 on `/ws` with `X-Ingress-Path`, because HA strips the prefix.
+  - **Linter:** the repo was renamed `frenck/action-app-linter`. `frenck/action-addon-linter@v2` still resolves through GitHub's redirect.
+
 ### D10. Hosting and image publishing
 - **Repository:** public GitHub repo `https://github.com/farajfarook/paseo-ha-addon`, created with `gh repo create farajfarook/paseo-ha-addon --public` from this directory. `main` is the default branch. `repository.yaml` `url` and the README "Add repository" link point to it. The license is Apache-2.0, to match Paseo.
 - **Images:** `paseo/config.yaml` sets `image: ghcr.io/farajfarook/{arch}-addon-paseo`. The Supervisor substitutes `{arch}` and pulls the tag that equals the add-on `version`.
@@ -140,6 +151,9 @@ Paseo has three configuration layers: defaults, then `$PASEO_HOME/config.json`, 
 - **Visibility:** GHCR creates new packages as private. After the first publish, each of the three packages must be set to **Public** once (Package settings → Change visibility), because the Supervisor pulls anonymously. The packages are linked to the repo via the `org.opencontainers.image.source` label so they show up on the repo page.
 - **Release order:** bump `version` + CHANGELOG → merge → tag `v<version>` → the publish workflow pushes the images → users see the update. If the tag were published before its images existed, installs would fail. Because the Supervisor reads `version` from `main`, the version bump is merged only together with the tag, and the tag is pushed immediately after the merge.
 - **Alternative:** leave out `image:` and let the Supervisor build locally. That was rejected because the build is slow on Raspberry Pi-class hardware and native module compiles can fail on-device.
+
+- **Implementation note (task 8.4):** `publish.yaml` uses the same per-arch build-image jobs with `push: true` and no multi-arch manifest. Images stay per-arch, `ghcr.io/farajfarook/{arch}-addon-paseo:<version>` and `:latest`, matching `config.yaml` `image:`. The action's built-in cosign is off; a separate keyless cosign step with `continue-on-error` signs, so signing can't block a release. `id-token: write` is granted only in `publish.yaml`.
+- `.github/scripts/check-version.sh <tag>` strips `refs/tags/` and `v`, then compares the result with `paseo/config.yaml` `version`. The `guard` job runs it on the checked-out tag, and the publish matrix has `needs: guard`, so a mismatch pushes nothing.
 
 ### D11. Home Assistant folder mappings
 - Implementation note (task 1.2): the local linter accepts `all_addon_configs` + `addon_config` together. Supervisor acceptance is still verified on a real HA (task 4b.3).
@@ -178,6 +192,15 @@ The folder is seeded on first start, and files are never overwritten once they e
 - **Instructions:** the bundled HA guidance (D14) and the user's `/config/AGENTS.md` are concatenated into each tool's global instruction file on every start: `~/.claude/CLAUDE.md`, `$CODEX_HOME/AGENTS.md`, `$XDG_CONFIG_HOME/opencode/AGENTS.md` and `$PI_CODING_AGENT_DIR/AGENTS.md`. These generated files live in `/data` and carry a "generated, edit /config/AGENTS.md instead" header. Generating them keeps bundled guidance updatable without overwriting user edits.
 - Tool settings files (`~/.claude/settings.json`, `opencode.json`, Pi `settings.json`, Codex `config.toml`) stay in `/data` because they're single files rewritten by the tools. Advanced users edit them via a Paseo terminal.
 
+- **Implementation note (4a):** the hooks are `30-agent-config.sh` (fill `/config`, link folders), `32-skills.sh` (per-skill links) and `35-instructions.sh` (generated instruction files).
+  - If a real directory already exists where a folder link should go, it is moved to `<dir>.paseo-ha-backup-<timestamp>`, never deleted.
+  - Claude Code with `CLAUDE_CONFIG_DIR` set reads `CLAUDE.md`, `agents/`, `commands/`, `skills/` and `.claude.json` from `$CLAUDE_CONFIG_DIR`. That equals `$HOME/.claude` here, so one set of links covers both.
+  - Codex reads `~/.agents/skills` and `$CODEX_HOME/AGENTS.md`.
+  - OpenCode reads `~/.agents/skills`, `~/.claude/skills` and `$XDG_CONFIG_HOME/opencode/{AGENTS.md,agents,plugins}`.
+  - Pi reads `~/.agents/skills` and `$PI_CODING_AGENT_DIR/{AGENTS.md,extensions,prompts,mcp.json}`.
+- **Paseo skill sync coexistence (verified):** Paseo 0.10.3 writes its skills as real folders into `~/.agents/skills`, `~/.claude/skills` and `~/.codex/skills`, and only creates or deletes its own names. Its install and uninstall leave our links alone. A user skill named like a Paseo skill is skipped with a warning, because Paseo refuses to write through links.
+- The skill manifest is `/data/paseo-ha/skill-links.manifest`. Bundled skills are linked first and `/config/skills` second, so a user skill with the same name wins. Dangling links we created are removed even if the manifest is lost.
+
 ### D13. Live HA access: Core API, Supervisor and `ha` CLI
 - `config.yaml`: `homeassistant_api: true`, `hassio_api: true`, `hassio_role: manager`. The Supervisor injects `SUPERVISOR_TOKEN`, and the daemon environment (and so every agent) inherits it. The add-on also exports `HASS_SERVER=http://supervisor/core` and `HASS_TOKEN=$SUPERVISOR_TOKEN` as conventional names.
 - **Core API:** REST at `http://supervisor/core/api/...` (e.g. `POST /api/config/core/check_config`, `POST /api/services/automation/reload`, `GET /api/states`). WebSocket at `ws://supervisor/core/websocket` for registries, dashboards and similar. Both are authorised with `Authorization: Bearer $SUPERVISOR_TOKEN`.
@@ -185,15 +208,29 @@ The folder is seeded on first start, and files are never overwritten once they e
 - **Role choice:** `manager` permits Core restart and add-on management but not host/OS operations (that needs `admin`). The linter flags elevated roles in the security rating, which is acceptable and documented.
 - `ha core restart` restarts Core only. The Paseo add-on keeps running, so the agent session survives and can read logs afterwards.
 
+- Implementation note (task 2.5): the static `ha` CLI is pinned to `HA_CLI_VERSION=5.5.0` for amd64/aarch64. home-assistant/cli stopped publishing `ha_armv7` after 4.46.0, so armv7 uses `HA_CLI_ARMV7_VERSION=4.46.0`. Both are in `build.yaml` args. The arch comes from `BUILD_ARCH`, falling back to `TARGETARCH` and then `uname -m`. `ha` has no `--version` flag (checks use `ha help`). In 5.x, `ha addons` is a deprecated alias of `ha apps`; the bundled skill notes both forms.
+- Implementation note (4b.1): `40-ha-env.sh` exports `HASS_SERVER=http://supervisor/core`, plus `SUPERVISOR_TOKEN` and `HASS_TOKEN` when the token is present. It falls back to reading `/run/s6/container_environment/SUPERVISOR_TOKEN`, and logs a non-fatal warning when there is no token. The helper `paseo-ha-ws '<json>'` sends one authenticated WebSocket API command (default `ws://supervisor/core/websocket`); the skill uses it for registries and dashboards.
+
 ### D13a. Home Assistant MCP wiring
 - HA's `mcp_server` integration serves Streamable HTTP at `/api/mcp`. Via the Supervisor proxy this is `http://supervisor/core/api/mcp`. **Must verify** that the proxy forwards it, including streaming. Fallback: `http://homeassistant:8123/api/mcp` on the internal network with the same token. If neither works with `SUPERVISOR_TOKEN`, document a long-lived token supplied via `env_vars` as `HA_MCP_TOKEN`.
 - On each start `init-paseo` probes the endpoint. If it responds (not 404), the add-on writes an `homeassistant` MCP server entry into each MCP-capable agent's user config, merging rather than replacing:
   - Claude: `~/.claude.json` `mcpServers`, via `claude mcp add --scope user --transport http`.
   - Codex: a `[mcp_servers.homeassistant]` table in `$CODEX_HOME/config.toml`, with a bearer header.
   - OpenCode: an `mcp.homeassistant` entry of type `remote` in `opencode.json`, with headers.
-  - Pi has no built-in MCP, so it relies on REST/CLI via the HA skill.
+  - Pi: **Pi 1.0.0 reads `$PI_CODING_AGENT_DIR/mcp.json`** (this corrects the earlier assumption that Pi has no MCP), so it gets an `mcpServers.homeassistant` entry too. It also keeps REST/CLI access via the HA skill.
 - If the probe returns 404, the add-on logs one info line explaining how to enable the integration.
 - Paseo's own MCP injection (`mcp.injectIntoAgents`) is unaffected.
+
+- **D13a outcome (local, mock Supervisor):**
+  - **Endpoint:** HA's `/api/mcp` is a stateless, POST-only JSON endpoint. It returns 404 "Model Context Protocol server is not configured" when the integration is missing. The Supervisor proxy forwards `Mcp-Session-Id`, `MCP-Protocol-Version` and `Accept`, and streams `text/event-stream`, so the proxy route should work. **This still needs confirming on a real HA (task 4b.4).**
+  - **Probe:** `45-ha-mcp.sh` sends an `initialize` POST (3 s connect / 8 s total) to `http://supervisor/core/api/mcp`, then `http://homeassistant:8123/api/mcp`. The token is `$HA_MCP_TOKEN` (from `env_vars`) when set, else `$SUPERVISOR_TOKEN`.
+  - **No token on disk:** config entries name the environment variable instead of containing the token:
+    - Claude: `$CLAUDE_CONFIG_DIR/.claude.json` `mcpServers.homeassistant` `{type:http, headers.Authorization:"Bearer ${VAR}"}`, edited with jq.
+    - Codex: `[mcp_servers.homeassistant]` with `url` and `bearer_token_env_var = "VAR"`.
+    - OpenCode: `mcp.homeassistant` `{type:remote, headers.Authorization:"Bearer {env:VAR}"}`.
+    - Pi: `mcp.json` `mcpServers.homeassistant`.
+  - **Merge rules:** files are edited in place and other content is kept. Entries are added only for installed CLIs. An existing `homeassistant` entry with a URL that isn't ours counts as the user's and is left alone. When no endpoint is found, only entries we wrote are removed.
+  - **Log lines:** 404 or unreachable logs one info line on enabling the integration. 401/403 logs a hint to set `HA_MCP_TOKEN`.
 
 ### D14. Bundled Home Assistant guidance
 - The image ships `/opt/paseo-ha/skills/home-assistant/SKILL.md` (plus `reference/*.md`) and `/opt/paseo-ha/AGENTS.base.md`. These are versioned with the add-on and read-only.
@@ -226,6 +263,8 @@ The folder is seeded on first start, and files are never overwritten once they e
 - The same oneshot also registers the workspace option's path when it differs from `/homeassistant`.
 - Failure is logged and non-fatal.
 
+- Implementation note: the `paseo-ha-bootstrap` oneshot depends on `paseo` and uses `paseo project ls|create|rename --home $PASEO_HOME --json`. It matches projects by path, renames only a project it just created, also registers `$PASEO_HA_WORKSPACE` when it differs, and always exits 0.
+
 ### D15. Optional git snapshots (`git_snapshot`, default false)
 - When enabled and `/homeassistant/.git` does not exist:
   1. `git init -b main`.
@@ -235,6 +274,8 @@ The folder is seeded on first start, and files are never overwritten once they e
 - If `.git` already exists, do nothing to it. Mark it as a `safe.directory` because root owns it.
 - The bundled guidance instructs agents to commit before and after each change with descriptive messages when `/homeassistant/.git` exists. Users can review the history in a Paseo terminal and the git UI.
 - Disabling the option later does not delete `.git`.
+
+- Implementation note: `48-git-snapshot.sh` uses identity `Paseo Agent <paseo-agent@homeassistant.local>`. The `.gitignore` also excludes `.ha_run.lock`. `safe.directory` is set whenever `/homeassistant/.git` exists, even with the option off. The global git config lives under `/data/home`.
 
 ## Risks / Trade-offs
 

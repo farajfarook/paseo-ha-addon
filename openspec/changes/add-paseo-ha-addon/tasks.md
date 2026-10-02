@@ -13,9 +13,9 @@
 
 - [x] 2.1 Write `paseo/Dockerfile`: `ARG BUILD_FROM`, install `nodejs npm nginx git openssh-client bash curl` plus build-stage `build-base python3 linux-headers`, set `ONNXRUNTIME_NODE_INSTALL=skip`, then `npm install -g @getpaseo/cli@${PASEO_VERSION}` and verify `node --version` ≥ 22.19 and `paseo --version` print the pinned version in a local amd64 build
 - [x] 2.2 Add `npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_VERSION}` and verify `pi --version` runs inside the built image
-- [ ] 2.3 Build for `aarch64` and `armv7` via `home-assistant/builder --test` (QEMU) and check that `node -e "require('node-pty')"` works in each image. If musl/armv7 fails, apply the Debian-base fallback from design D1 and record the outcome in design.md
-- [ ] 2.4 Add a Docker `HEALTHCHECK` against `http://127.0.0.1:6767/api/health` and verify `docker inspect` reports healthy after start
-- [ ] 2.5 Install the pinned per-arch static `ha` CLI binary (`ARG HA_CLI_VERSION`) and verify `ha --version` runs in each arch image
+- [x] 2.3 Build for `aarch64` and `armv7` via `home-assistant/builder --test` (QEMU) and check that `node -e "require('node-pty')"` works in each image. If musl/armv7 fails, apply the Debian-base fallback from design D1 and record the outcome in design.md
+- [x] 2.4 Add a Docker `HEALTHCHECK` against `http://127.0.0.1:6767/api/health` and verify `docker inspect` reports healthy after start
+- [x] 2.5 Install the pinned per-arch static `ha` CLI binary (`ARG HA_CLI_VERSION`) and verify `ha --version` runs in each arch image
 
 ## 3. Runtime: init, daemon service, persistence
 
@@ -37,10 +37,10 @@
 
 ## 4a. Editable agent config (design D12)
 
-- [ ] 4a.1 Seed `/config` (`AGENTS.md`, `README.md`, `skills/`, `claude/agents|commands`, `opencode/agents|plugins`, `pi/extensions|prompts`, `codex/prompts`) on first start without overwriting existing files. Verify that a second start leaves an edited `AGENTS.md` unchanged
-- [ ] 4a.2 Create directory symlinks from each tool folder into `/config` on every start. Verify that an agent definition in `/config/claude/agents` shows up in Claude and a Pi extension in `/config/pi/extensions` loads
-- [ ] 4a.3 Create per-skill symlinks for `/config/skills/*` into `~/.agents/skills` and `~/.claude/skills`, with a manifest in `/data` and cleanup of dangling links. Verify that a test skill is listed by Pi, Claude, Codex and OpenCode, and that after a daemon restart Paseo's own skills and the user links both still exist
-- [ ] 4a.4 Generate global instruction files (Claude `CLAUDE.md`, Codex/OpenCode/Pi `AGENTS.md`) from `/opt/paseo-ha/AGENTS.base.md` + `/config/AGENTS.md` with a generated header. Verify that a sentence added to `/config/AGENTS.md` appears in each generated file after a restart
+- [x] 4a.1 Seed `/config` (`AGENTS.md`, `README.md`, `skills/`, `claude/agents|commands`, `opencode/agents|plugins`, `pi/extensions|prompts`, `codex/prompts`) on first start without overwriting existing files. Verify that a second start leaves an edited `AGENTS.md` unchanged
+- [x] 4a.2 Create directory symlinks from each tool folder into `/config` on every start. Verify that an agent definition in `/config/claude/agents` shows up in Claude and a Pi extension in `/config/pi/extensions` loads
+- [x] 4a.3 Create per-skill symlinks for `/config/skills/*` into `~/.agents/skills` and `~/.claude/skills`, with a manifest in `/data` and cleanup of dangling links. Verify that a test skill is listed by Pi, Claude, Codex and OpenCode, and that after a daemon restart Paseo's own skills and the user links both still exist
+- [x] 4a.4 Generate global instruction files (Claude `CLAUDE.md`, Codex/OpenCode/Pi `AGENTS.md`) from `/opt/paseo-ha/AGENTS.base.md` + `/config/AGENTS.md` with a generated header. Verify that a sentence added to `/config/AGENTS.md` appears in each generated file after a restart
 - [ ] 4a.5 Verify with `find /config` after an agent login and a session that no credential, session or key-pair file is written to `/config`
 
 ## 4b. Home Assistant integration (design D11, D13–D15)
@@ -50,9 +50,9 @@
 - [ ] 4b.3 Verify the mappings on a real HA: write a file to `/homeassistant` and `/addon_configs/<other>`, confirm that writes to `/ssl`, `/media` and `/backup` fail as read-only, and confirm the `all_addon_configs` + `addon_config` combination is accepted (else apply the D11 fallback)
 - [ ] 4b.4 Probe HA's MCP endpoint via `http://supervisor/core/api/mcp` (fallback `http://homeassistant:8123/api/mcp`) with `SUPERVISOR_TOKEN`, record the result in design.md D13a, and implement the per-agent MCP config merge for Claude, Codex and OpenCode. Verify that with HA's MCP Server integration enabled each lists HA tools, and that without it sessions start and one info log line appears
 - [ ] 4b.5 Write the bundled skill `/opt/paseo-ha/skills/home-assistant` (paths, layout, API/CLI recipes, workflow, hard rules) and `AGENTS.base.md`, linked per D12/D14. Verify by asking Pi to "add an automation that turns on <test light> at sunset": it edits the right file, runs check_config, reloads automations, verifies via the API, and doesn't print `secrets.yaml`
-- [ ] 4b.6 Verify user override: copy the skill to `/config/skills/home-assistant`, edit it, restart, and confirm the user's version is the one agents load
-- [ ] 4b.7 Add the `paseo-ha-bootstrap` oneshot (after daemon health) that ensures a single "Home Assistant" project for `/homeassistant` via the `paseo project` CLI. Verify on first open it is listed, that after a restart there is still exactly one, and that a user rename is kept
-- [ ] 4b.8 Implement `git_snapshot` (init, `.gitignore` if absent, local identity, `safe.directory`, initial commit, and never touching an existing repo). Verify that with defaults no `.git` is created, that enabling it creates a repo whose `git status` doesn't show `secrets.yaml`/`.storage`, that an existing repo is left unchanged, and that `git revert` of an agent commit restores the file
+- [x] 4b.6 Verify user override: copy the skill to `/config/skills/home-assistant`, edit it, restart, and confirm the user's version is the one agents load
+- [x] 4b.7 Add the `paseo-ha-bootstrap` oneshot (after daemon health) that ensures a single "Home Assistant" project for `/homeassistant` via the `paseo project` CLI. Verify on first open it is listed, that after a restart there is still exactly one, and that a user rename is kept
+- [x] 4b.8 Implement `git_snapshot` (init, `.gitignore` if absent, local identity, `safe.directory`, initial commit, and never touching an existing repo). Verify that with defaults no `.git` is created, that enabling it creates a repo whose `git status` doesn't show `secrets.yaml`/`.storage`, that an existing repo is left unchanged, and that `git revert` of an agent commit restores the file
 
 ## 5. Ingress adapter
 

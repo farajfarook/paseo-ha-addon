@@ -33,6 +33,8 @@ Never restore a backup without the user's explicit request.
 
 ## Add-ons
 
+The bundled `ha` CLI 5.x renamed `ha addons` to `ha apps` (`ha addons` still works but prints a deprecation warning). On armv7 the CLI is 4.46, where only `ha addons` exists. Both forms below work on 5.x. `ha` has no `--version` flag; use `ha info`.
+
 ```sh
 ha addons                     # installed add-ons with slugs and states
 ha addons info <slug>         # details, options, version
