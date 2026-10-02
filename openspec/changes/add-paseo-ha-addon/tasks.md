@@ -31,8 +31,8 @@
 
 ## 4. Optional agents
 
-- [ ] 4.1 Implement agent install in `init-paseo`: map `claude-code|codex|opencode` to npm packages, `npm install --prefix /data/agents`, keep a stamp file so unchanged selections skip reinstall, uninstall deselected agents, and prepend `/data/agents/node_modules/.bin` to the daemon `PATH`. Verify that selecting `codex` makes `codex --version` available in a Paseo terminal and that a second start makes no network install
-- [ ] 4.2 Make install failures non-fatal and log per-agent errors. Verify by forcing an invalid package/no network that the add-on still starts and Pi is still listed as a provider
+- [x] 4.1 Implement agent install in `init-paseo`: map `claude-code|codex|opencode` to npm packages, `npm install --prefix /data/agents`, keep a stamp file so unchanged selections skip reinstall, uninstall deselected agents, and prepend `/data/agents/node_modules/.bin` to the daemon `PATH`. Verify that selecting `codex` makes `codex --version` available in a Paseo terminal and that a second start makes no network install
+- [x] 4.2 Make install failures non-fatal and log per-agent errors. Verify by forcing an invalid package/no network that the add-on still starts and Pi is still listed as a provider
 - [ ] 4.3 Verify in the Paseo UI that Pi and each selected agent appear as available providers and a deselected agent disappears after restart
 
 ## 4a. Editable agent config (design D12)

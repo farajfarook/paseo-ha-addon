@@ -18,6 +18,11 @@ bashio::log.info "Service paseo exited with code ${exit_code_service} (by signal
 if [[ "${exit_code_service}" -eq 256 && "${exit_code_signal}" -eq 15 ]]; then
   exit 0
 fi
+# The daemon handles SIGTERM itself and exits 0; ignore any exit while s6 wants the
+# service down (container stop / service stop).
+if [[ "$(s6-svstat -o wantedup . 2>/dev/null)" == "false" ]]; then
+  exit 0
+fi
 
 mkdir -p /run/paseo-ha
 now=$(date +%s)

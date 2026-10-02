@@ -32,6 +32,11 @@ for d in "${HOME}" "${PASEO_HOME}" "${CLAUDE_CONFIG_DIR}" "${CODEX_HOME}" \
 done
 chmod 700 "${HOME}"
 
+# No daemon can be running yet in this fresh container. A pid lock left in /data by
+# the previous container may name a PID that is reused here, which would make
+# `paseo daemon run` think another daemon is running and exit at once.
+rm -f "${PASEO_HOME}/paseo.pid"
+
 # Persistently installed agent CLIs (group 4) come first on PATH.
 mkdir -p "${PASEO_HA_DATA}/agents"
 ph_env_prepend_path "${PASEO_HA_DATA}/agents/node_modules/.bin"

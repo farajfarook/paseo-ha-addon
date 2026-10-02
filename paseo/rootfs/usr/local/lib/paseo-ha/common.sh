@@ -11,6 +11,15 @@ PASEO_HA_HOOK_DIR="${PASEO_HA_HOOK_DIR:-/etc/paseo-ha/init.d}"
 PASEO_HA_DAEMON_PORT="${PASEO_HA_DAEMON_PORT:-6767}"
 
 # Logging: use bashio when available, plain stderr otherwise (tests).
+# Hooks run in plain bash, so load bashio's library if it is installed.
+if ! declare -F bashio::log.info >/dev/null 2>&1 && [[ -f /usr/lib/bashio/bashio.sh ]]; then
+  # bashio enables `set -eu`; keep the caller's shell options intact.
+  __ph_saved_opts="$(set +o)"
+  # shellcheck disable=SC1091
+  source /usr/lib/bashio/bashio.sh || true
+  eval "${__ph_saved_opts}"
+  unset __ph_saved_opts
+fi
 if declare -F bashio::log.info >/dev/null 2>&1; then
   ph_log_info()  { bashio::log.info "$*"; }
   ph_log_warn()  { bashio::log.warning "$*"; }

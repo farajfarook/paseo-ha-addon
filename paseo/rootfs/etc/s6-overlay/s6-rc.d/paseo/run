@@ -17,7 +17,8 @@ if paseo daemon status --home "${PASEO_HOME}" --json 2>/dev/null | jq -e '.local
   ph_log_warn "Stopping leftover Paseo daemon instance"
   paseo daemon stop --home "${PASEO_HOME}" --force --timeout 15 >/dev/null 2>&1 || true
 fi
-pkill -9 -f '@getpaseo/server/dist/(scripts/supervisor-entrypoint|server/daemon-worker)' 2>/dev/null || true
+pkill -9 -f '^Paseo (Supervisor|Daemon)$|@getpaseo/server/dist/(scripts/supervisor-entrypoint|server/daemon-worker)' 2>/dev/null || true
+rm -f "${PASEO_HOME}/paseo.pid"
 
 ph_log_info "Starting Paseo daemon on ${PASEO_LISTEN}"
 # Readiness notifier: report "ready" on fd 3 once /api/health answers (max 10 min).
