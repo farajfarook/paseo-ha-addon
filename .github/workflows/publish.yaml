@@ -1,0 +1,157 @@
+# Publish per-arch add-on images to GHCR:
+#   ghcr.io/farajfarook/{arch}-addon-paseo:<version> and :latest
+# Triggered by a tag v<version> (or manually for an existing tag). The guard job
+# blocks every build when the tag differs from paseo/config.yaml `version`.
+# Uses home-assistant/builder's build-image action (the legacy
+# `home-assistant/builder` action is deprecated); paseo/build.yaml stays the
+# source of BUILD_FROM, build args and labels.
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish (e.g. v0.10.3-1); must match paseo/config.yaml version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Check tag matches add-on version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Resolve tag
+        id: ref
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          if [[ -z "${TAG}" || "${TAG}" != v* ]]; then
+            echo "::error::'${TAG}' is not a v<version> tag"
+            exit 1
+          fi
+          echo "ref=refs/tags/${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.ref.outputs.ref }}
+          persist-credentials: false
+
+      - name: Compare tag with paseo/config.yaml version
+        id: check
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: .github/scripts/check-version.sh "${TAG}"
+
+  publish:
+    name: Publish ${{ matrix.arch }}
+    needs: guard
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # keyless Cosign signing
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+            platform: linux/amd64
+          - arch: aarch64
+            os: ubuntu-24.04-arm
+            platform: linux/arm64
+          - arch: armv7
+            os: ubuntu-latest
+            platform: linux/arm/v7
+            qemu: true
+    env:
+      # build-image calls docker/build-push-action without `platforms`, so buildx
+      # builds for DOCKER_DEFAULT_PLATFORM (armv7 runs under QEMU).
+      DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
+      IMAGE: ghcr.io/farajfarook/${{ matrix.arch }}-addon-paseo
+      VERSION: ${{ needs.guard.outputs.version }}
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.guard.outputs.ref }}
+          persist-credentials: false
+
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm
+
+      - name: Read build settings from paseo/build.yaml
+        id: info
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          {
+            echo "build_args<<BUILD_ARGS_EOF"
+            .github/scripts/build-args.sh "${ARCH}"
+            echo "BUILD_ARGS_EOF"
+            echo "labels<<LABELS_EOF"
+            .github/scripts/build-args.sh --labels
+            echo "io.hass.type=addon"
+            echo "io.hass.name=Paseo"
+            echo "LABELS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        id: build
+        uses: home-assistant/builder/actions/build-image@2026.09.0
+        with:
+          arch: ${{ matrix.arch }}
+          context: ./paseo
+          build-args: ${{ steps.info.outputs.build_args }}
+          labels: ${{ steps.info.outputs.labels }}
+          container-registry: ghcr.io
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ env.IMAGE }}
+          image-tags: |
+            ${{ env.VERSION }}
+            latest
+          version: ${{ env.VERSION }}
+          # Signing runs as a separate, non-blocking step below.
+          cosign: "false"
+          push: "true"
+
+      - name: Check pushed platform
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          got="$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Image}}' \
+            | jq -r '"\(.os)/\(.architecture)\(if .variant then "/" + .variant else "" end)"')"
+          echo "${IMAGE}:${VERSION}: ${got}"
+          if [[ "${got}" != "${PLATFORM}" ]]; then
+            echo "::error::expected ${PLATFORM}, got ${got}"
+            exit 1
+          fi
+
+      - name: Install Cosign
+        continue-on-error: true
+        uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Sign image (non-blocking)
+        continue-on-error: true
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
