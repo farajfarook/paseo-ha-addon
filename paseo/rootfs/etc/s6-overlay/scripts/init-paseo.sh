@@ -49,11 +49,35 @@ if ! mkdir -p "${WORKSPACE}" 2>/dev/null; then
 fi
 ph_env_set PASEO_HA_WORKSPACE "${WORKSPACE}"
 
+# --- Direct port (group 6, design D4) ------------------------------------------
+# The daemon stays loopback-only unless the user mapped port 6767 AND set a
+# password. With both, the daemon listens on 0.0.0.0 for the Paseo apps/CLI and
+# nginx authenticates upstream (see 50-nginx.sh) so ingress stays password-free.
+PASSWORD="$(ph_opt .password)"
+DIRECT_PORT=""
+if bashio::addon.available 2>/dev/null; then
+  DIRECT_PORT="$(bashio::addon.port '6767' 2>/dev/null || true)"
+else
+  DIRECT_PORT="${PASEO_HA_DIRECT_PORT:-}"   # test seam for non-Supervisor environments
+fi
+
 # --- Fixed Paseo settings (D7a: add-on owned) ----------------------------------
 ph_env_set PASEO_WEB_UI_ENABLED true
 ph_env_set PASEO_LISTEN "127.0.0.1:${PASEO_HA_DAEMON_PORT}"
 ph_env_set PASEO_TRUSTED_PROXIES loopback
 ph_env_set PASEO_LOG_CONSOLE_FORMAT pretty
+
+if [[ -n "${PASSWORD}" ]]; then
+  if [[ -n "${DIRECT_PORT}" ]]; then
+    ph_env_set PASEO_LISTEN "0.0.0.0:${PASEO_HA_DAEMON_PORT}"
+    ph_env_set PASEO_PASSWORD "${PASSWORD}"
+    ph_log_info "Direct port ${PASEO_HA_DAEMON_PORT} enabled with password (host port ${DIRECT_PORT})"
+  else
+    ph_log_warn "A password is set but port ${PASEO_HA_DAEMON_PORT} is not mapped; the daemon stays loopback-only and the direct port stays disabled"
+  fi
+elif [[ -n "${DIRECT_PORT}" ]]; then
+  ph_log_warn "Port ${PASEO_HA_DAEMON_PORT} is mapped but no password is set; the daemon stays loopback-only, so the direct port refuses outside connections"
+fi
 
 LOG_LEVEL="$(ph_opt .log_level info)"
 ph_env_set PASEO_LOG_CONSOLE_LEVEL "${LOG_LEVEL}"

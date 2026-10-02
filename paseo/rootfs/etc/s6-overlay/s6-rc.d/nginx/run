@@ -1,0 +1,9 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# nginx: serve the ingress adapter on 8099 (group 5, design D3). Starts only
+# after the paseo service is ready (dependencies.d/paseo + the daemon's fd 3
+# readiness notification), so the config render (50-nginx.sh, run by
+# init-paseo) has already happened too.
+# ==============================================================================
+exec nginx -g "daemon off;"

@@ -56,10 +56,10 @@
 
 ## 5. Ingress adapter
 
-- [ ] 5.1 Add an nginx server template on port 8099: `allow 172.30.32.2; deny all;`, proxy to `127.0.0.1:6767` with WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts, `client_max_body_size 100m`, `Host 127.0.0.1:6767`, and an `Origin` rewrite. Verify with `curl` from a non-allowed IP that you get 403, and through the allowed path that `/api/health` returns 200
-- [ ] 5.2 Add `sub_filter` rules (with `Accept-Encoding ""` upstream) that prefix `/_expo/`, `/manifest.json`, `/favicon.ico` and `/apple-touch-icon.png` with `$http_x_ingress_path` and inject `<script src="<prefix>/paseo-ha/shim.js">` before `</head>`. Verify with `curl -H "X-Ingress-Path: /api/hassio_ingress/test"` that the returned `index.html` has prefixed URLs and the shim tag
+- [x] 5.1 Add an nginx server template on port 8099: `allow 172.30.32.2; deny all;`, proxy to `127.0.0.1:6767` with WebSocket upgrade, `proxy_buffering off`, 3600 s timeouts, `client_max_body_size 100m`, `Host 127.0.0.1:6767`, and an `Origin` rewrite. Verify with `curl` from a non-allowed IP that you get 403, and through the allowed path that `/api/health` returns 200
+- [x] 5.2 Add `sub_filter` rules (with `Accept-Encoding ""` upstream) that prefix `/_expo/`, `/manifest.json`, `/favicon.ico` and `/apple-touch-icon.png` with `$http_x_ingress_path` and inject `<script src="<prefix>/paseo-ha/shim.js">` before `</head>`. Verify with `curl -H "X-Ingress-Path: /api/hassio_ingress/test"` that the returned `index.html` has prefixed URLs and the shim tag
 - [ ] 5.3 Write `paseo-ha/shim.js`. It sets `__PASEO_INITIAL_DAEMON_CONNECTION__` from `location` (host + explicit port, `useTls` from scheme), rewrites same-host `/ws` WebSocket URLs and `/api/`, `/mcp/` and `/public/` fetch/XHR URLs to the ingress prefix, and maps `history`/`location` so the router sees app-relative paths. Verify in a browser behind a local mock ingress (nginx adding `X-Ingress-Path` and a path prefix) that the UI auto-connects, live agent output streams, and a deep-link reload returns to the same page
-- [ ] 5.4 Add an s6 `nginx` longrun that depends on `paseo` readiness and renders the template from `init-paseo`. Verify that nginx starts only after `/api/health` is up
+- [x] 5.4 Add an s6 `nginx` longrun that depends on `paseo` readiness and renders the template from `init-paseo`. Verify that nginx starts only after `/api/health` is up
 - [ ] 5.5 Click-test the main UI flows under the mock ingress (new session, terminal, file pane, download, settings) and fix or document any URL that escapes the prefix in `DOCS.md` "Known limitations"
 
 ## 6. Direct port and auth
