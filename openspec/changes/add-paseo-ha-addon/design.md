@@ -42,6 +42,7 @@ paseo/
 ```
 - `build.yaml` uses the user-specified `ghcr.io/home-assistant/{aarch64,amd64,armv7}-base:latest` (Alpine + s6-overlay v3 + bashio). Node is installed with `apk add nodejs npm`, using an Alpine release whose `nodejs` is ≥ 22.19 (verify at implementation; otherwise pin the `-base:<alpine-version>` tag that provides it).
 - **Alternative considered:** `ghcr.io/home-assistant/*-base-debian` or extending `ghcr.io/getpaseo/paseo`. The upstream image has no armv7 and no s6/bashio. Debian base would avoid musl risk for `node-pty`/`sherpa-onnx-node`. Alpine is kept because the user asked for it. **Fallback:** if `npm install` of `@getpaseo/cli` fails on musl (no prebuilt binary and no build toolchain), switch `build_from` to `*-base-debian:bookworm` and install Node 22 from NodeSource. The Dockerfile is written so only the `FROM`/package-install stage differs.
+- Implementation note (task 1.3): `ghcr.io/home-assistant/amd64-base:latest` is Alpine 3.24.1, and its `nodejs` package is 24.18.1 (≥ 22.19), so `:latest` is kept.
 - Native modules: install `build-base python3 linux-headers` in a build stage so `node-pty` can compile from source on musl/armv7. Set `ONNXRUNTIME_NODE_INSTALL=skip`. If `sherpa-onnx-node` has no binary for the platform, voice features degrade but the daemon must still start. Treat this as an acceptance check per arch.
 
 ### D2. Pinned Paseo version
@@ -80,6 +81,7 @@ Paseo assumes it lives at `/`, but under ingress the browser is at `/api/hassio_
 - s6-overlay v3 services: `init-paseo` (oneshot: read options, prepare dirs, install agents, render nginx config) → `paseo` (longrun: `paseo daemon run`, or the server's `supervisor-entrypoint.js` as in upstream Docker, with `PASEO_WEB_UI_ENABLED=true`, `PASEO_LISTEN`, `PASEO_LOG_FORMAT=text`) and `nginx` (longrun, depends on `paseo` readiness).
 - A `finish` script calls `/run/s6/basedir/bin/halt` after repeated failures so the Supervisor `watchdog: tcp://[HOST]:[PORT:8099]` restarts the add-on. The Docker `HEALTHCHECK` polls `http://127.0.0.1:6767/api/health`.
 - `init: false` in `config.yaml` (required for s6-overlay v3).
+- **Implementation note (task 1.2):** the current `frenck/action-addon-linter` rejects `watchdog:` as obsolete ("use the native Docker HEALTHCHECK directive instead") and rejects `startup`/`boot`/`ingress_port: 8099` because they equal defaults. `config.yaml` therefore omits them. Health monitoring uses the image's Docker `HEALTHCHECK` against the daemon (task 2.4) instead, and the `finish` halt still makes the add-on stop on repeated crashes. The linter also warns that `armv7` is deprecated as of HA 2025.12; it stays in `arch` because the spec requires it (best-effort).
 
 ### D6. Persistence, files and user
 - **Private state** lives under `/data`, which is per-add-on, persistent, in backups and not visible to File Editor or Samba. `HOME=/data/home` and `PASEO_HOME=/data/home/.paseo`. `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `XDG_*` and `PI_CODING_AGENT_DIR=/data/home/.pi/agent` all live under `/data/home`. All credentials, sessions, history, caches, `~/.claude.json` and Paseo's `config.json` and daemon key pair stay here.
@@ -137,6 +139,8 @@ Paseo has three configuration layers: defaults, then `$PASEO_HOME/config.json`, 
 - **Alternative:** leave out `image:` and let the Supervisor build locally. That was rejected because the build is slow on Raspberry Pi-class hardware and native module compiles can fail on-device.
 
 ### D11. Home Assistant folder mappings
+- Implementation note (task 1.2): the local linter accepts `all_addon_configs` + `addon_config` together. Supervisor acceptance is still verified on a real HA (task 4b.3).
+
 ```yaml
 map:
   - type: homeassistant_config   # → /homeassistant

@@ -1,0 +1,12 @@
+build_from:
+  aarch64: ghcr.io/home-assistant/aarch64-base:latest
+  amd64: ghcr.io/home-assistant/amd64-base:latest
+  armv7: ghcr.io/home-assistant/armv7-base:latest
+labels:
+  org.opencontainers.image.title: "Home Assistant Add-on: Paseo"
+  org.opencontainers.image.description: Paseo daemon and web UI for Home Assistant
+  org.opencontainers.image.source: https://github.com/farajfarook/paseo-ha-addon
+  org.opencontainers.image.licenses: Apache-2.0
+args:
+  PASEO_VERSION: 0.10.3
+  PI_VERSION: 1.0.0

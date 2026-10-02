@@ -1,0 +1,60 @@
+name: Paseo
+version: "0.10.3-1"
+slug: paseo
+description: Configure Home Assistant with coding agents (Pi, Claude Code, Codex, OpenCode) from the sidebar
+url: https://github.com/farajfarook/paseo-ha-addon
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+image: ghcr.io/farajfarook/{arch}-addon-paseo
+ingress: true
+panel_title: Paseo
+panel_icon: mdi:robot-outline
+ports:
+  6767/tcp: null
+ports_description:
+  6767/tcp: Direct Paseo access for apps/CLI (requires password)
+map:
+  - type: homeassistant_config
+    read_only: false
+  - type: all_addon_configs
+    read_only: false
+  - type: addon_config
+    read_only: false
+  - type: share
+    read_only: false
+  - type: ssl
+  - type: media
+  - type: backup
+homeassistant_api: true
+hassio_api: true
+hassio_role: manager
+options:
+  workspace: /homeassistant
+  git_snapshot: false
+  agents: []
+  env_vars: []
+  hostnames: []
+  log_level: info
+  dictation: false
+  voice_mode: false
+  speech_provider: local
+schema:
+  workspace: str
+  git_snapshot: bool
+  agents:
+    - list(claude-code|codex|opencode)
+  env_vars:
+    - name: match(^[A-Za-z_][A-Za-z0-9_]*$)
+      value: password
+  password: password?
+  hostnames:
+    - str
+  log_level: list(trace|debug|info|warn|error)
+  dictation: bool
+  voice_mode: bool
+  speech_provider: list(local|openai)
+  worktrees_root: str?
+  relay: bool?
