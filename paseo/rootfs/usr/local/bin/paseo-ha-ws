@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+// paseo-ha-ws: send one Home Assistant WebSocket API command and print the result as JSON.
+//
+//   paseo-ha-ws '{"type":"config/entity_registry/list"}'
+//   echo '{"type":"lovelace/config","url_path":null}' | paseo-ha-ws
+//
+// Connects to $HASS_WS_URL (default ws://supervisor/core/websocket) and authenticates
+// with $SUPERVISOR_TOKEN (or $HASS_TOKEN). The "id" field is added automatically.
+// Exit status: 0 on success, 1 on an HA error result, 2 on connection/auth/usage errors.
+"use strict";
+
+const url = process.env.HASS_WS_URL || "ws://supervisor/core/websocket";
+const token = process.env.SUPERVISOR_TOKEN || process.env.HASS_TOKEN;
+const timeoutMs = Number(process.env.HASS_WS_TIMEOUT_MS || 30000);
+
+function fail(message, code = 2) {
+  process.stderr.write(`paseo-ha-ws: ${message}\n`);
+  process.exit(code);
+}
+
+async function readCommand() {
+  if (process.argv[2]) return process.argv[2];
+  if (process.stdin.isTTY) fail("usage: paseo-ha-ws '<json command>'");
+  let data = "";
+  for await (const chunk of process.stdin) data += chunk;
+  return data;
+}
+
+(async () => {
+  if (!token) fail("SUPERVISOR_TOKEN (or HASS_TOKEN) is not set");
+  let command;
+  try {
+    command = JSON.parse(await readCommand());
+  } catch (error) {
+    fail(`command is not valid JSON: ${error.message}`);
+  }
+  if (!command || typeof command.type !== "string") fail('command needs a "type" field');
+
+  const ws = new WebSocket(url);
+  const timer = setTimeout(() => fail(`timed out after ${timeoutMs} ms`), timeoutMs);
+  ws.addEventListener("error", () => fail(`cannot connect to ${url}`));
+  ws.addEventListener("message", (event) => {
+    let msg;
+    try {
+      msg = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (msg.type === "auth_required") {
+      ws.send(JSON.stringify({ type: "auth", access_token: token }));
+    } else if (msg.type === "auth_invalid") {
+      fail("authentication rejected");
+    } else if (msg.type === "auth_ok") {
+      ws.send(JSON.stringify({ ...command, id: 1 }));
+    } else if (msg.type === "result" && msg.id === 1) {
+      clearTimeout(timer);
+      if (msg.success) {
+        process.stdout.write(`${JSON.stringify(msg.result, null, 2)}\n`);
+        ws.close();
+        process.exit(0);
+      }
+      process.stdout.write(`${JSON.stringify(msg.error, null, 2)}\n`);
+      ws.close();
+      process.exit(1);
+    }
+  });
+})();
