@@ -1,0 +1,114 @@
+# Test build of the add-on image for every architecture (no push), plus an
+# amd64 smoke test of the ingress adapter. Uses home-assistant/builder's
+# build-image action (the legacy `home-assistant/builder` --test action is
+# deprecated); paseo/build.yaml stays the source of BUILD_FROM, build args and
+# labels.
+name: Builder
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+            platform: linux/amd64
+          - arch: aarch64
+            os: ubuntu-24.04-arm
+            platform: linux/arm64
+          - arch: armv7
+            os: ubuntu-latest
+            platform: linux/arm/v7
+            qemu: true
+    env:
+      # build-image calls docker/build-push-action without `platforms`, so buildx
+      # builds for DOCKER_DEFAULT_PLATFORM (armv7 runs under QEMU).
+      DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-paseo
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm
+
+      - name: Read build settings from paseo/build.yaml
+        id: info
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          {
+            echo "version=$(awk '/^version:/ { gsub(/["\047]/, "", $2); print $2; exit }' paseo/config.yaml)"
+            echo "build_args<<BUILD_ARGS_EOF"
+            .github/scripts/build-args.sh "${ARCH}"
+            echo "BUILD_ARGS_EOF"
+            echo "labels<<LABELS_EOF"
+            .github/scripts/build-args.sh --labels
+            echo "io.hass.type=addon"
+            echo "io.hass.name=Paseo"
+            echo "LABELS_EOF"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+      - name: Build image (test, no push)
+        uses: home-assistant/builder/actions/build-image@2026.09.0
+        with:
+          arch: ${{ matrix.arch }}
+          context: ./paseo
+          build-args: ${{ steps.info.outputs.build_args }}
+          labels: ${{ steps.info.outputs.labels }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ env.IMAGE }}
+          image-tags: test
+          version: ${{ steps.info.outputs.version }}
+          cosign: "false"
+          push: "false"
+          load: "true"
+
+      - name: Check image platform
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          got="$(docker image inspect "${IMAGE}:test" --format '{{.Os}}/{{.Architecture}}{{with .Variant}}/{{.}}{{end}}')"
+          echo "${IMAGE}:test: ${got}"
+          if [[ "${got}" != "${PLATFORM}" ]]; then
+            echo "::error::expected ${PLATFORM}, got ${got}"
+            exit 1
+          fi
+
+  smoke:
+    name: Smoke test (amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build amd64 image
+        run: |
+          args=()
+          while IFS= read -r a; do args+=(--build-arg "${a}"); done < <(.github/scripts/build-args.sh amd64)
+          docker build "${args[@]}" -t paseo-smoke:ci paseo
+
+      - name: Run smoke test
+        run: paseo/tests/smoke/run.sh paseo-smoke:ci
