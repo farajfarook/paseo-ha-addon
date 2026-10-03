@@ -1,8 +1,9 @@
 # Ingress adapter template (design D3). Rendered by /etc/paseo-ha/init.d/50-nginx.sh
-# into /etc/nginx/http.d/paseo.conf. Placeholders:
-#   @UPSTREAM_AUTH_HTTP@  proxy_set_header Authorization ... (direct-port password only)
-#   @WS_PROTOCOLS_MAP@    map for the paseo.bearer WebSocket subprotocol (password only)
-#   @WS_PROTOCOLS_HEADER@ proxy_set_header Sec-WebSocket-Protocol ... (password only)
+# into /etc/nginx/http.d/paseo.conf by nginx/render.js, which substitutes three
+# tokens written below as UPSTREAM_AUTH_HTTP, WS_PROTOCOLS_MAP and
+# WS_PROTOCOLS_HEADER between at-signs (direct-port password only). Never write
+# those tokens with the at-signs inside a comment: the substitution is global
+# and would inject multi-line config into the comment.
 
 map $http_upgrade $connection_upgrade {
     default upgrade;
@@ -52,7 +53,7 @@ server {
 @WS_PROTOCOLS_HEADER@
 
         sub_filter_once off;
-        sub_filter_types text/html application/javascript application/json text/css;
+        sub_filter_types application/javascript application/json text/css;
 
         # Prefix root-absolute asset URLs with the ingress prefix. The prefix
         # comes from the X-Ingress-Path header the HA ingress proxy adds to
