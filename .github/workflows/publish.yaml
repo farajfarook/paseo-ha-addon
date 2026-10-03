@@ -159,3 +159,31 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+  # Create the GitHub Release only once every image exists, so a visible release
+  # always means a pullable image. Notes come from paseo/CHANGELOG.md.
+  release:
+    name: GitHub Release
+    needs: [guard, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.guard.outputs.ref }}
+          persist-credentials: false
+
+      - name: Create or update the release
+        run: |
+          .github/scripts/release-notes.sh "${VERSION}" > notes.md
+          tag="v${VERSION}"
+          if gh release view "${tag}" > /dev/null 2>&1; then
+            gh release edit "${tag}" --title "${VERSION}" --notes-file notes.md
+          else
+            gh release create "${tag}" --verify-tag --title "${VERSION}" --notes-file notes.md
+          fi

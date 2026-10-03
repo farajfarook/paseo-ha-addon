@@ -37,29 +37,28 @@ Apache-2.0, matching upstream Paseo. See [LICENSE](LICENSE).
 
 Home Assistant installs the pre-built image whose tag equals `version` in
 [`paseo/config.yaml`](paseo/config.yaml) on `main`
-(`ghcr.io/farajfarook/{arch}-addon-paseo:<version>`). The
-[Publish](.github/workflows/publish.yaml) workflow builds and pushes those images
-when a `v<version>` tag is pushed.
+(`ghcr.io/farajfarook/{arch}-addon-paseo:<version>`). The version is
+`<paseo>-<rev>`: the pinned Paseo release plus an add-on revision that resets to
+`1` on every Paseo bump. Releasing is automatic once a bump reaches `main`:
 
 1. On a branch, bump `version` in `paseo/config.yaml` (for example `0.10.3-2`, or
-   `0.10.4-1` for a new Paseo release) and add a matching entry at the top of
-   `paseo/CHANGELOG.md`. Wait for the Lint and Builder checks to pass.
-2. Merge to `main`.
-3. Tag the merge commit right away and push the tag:
-
-   ```bash
-   git checkout main && git pull
-   git tag v0.10.3-2
-   git push origin v0.10.3-2
-   ```
-
-4. The Publish workflow first checks that the tag (minus `v`) equals
-   `paseo/config.yaml` `version` and stops before building if it doesn't. It then
-   pushes `ghcr.io/farajfarook/{amd64,aarch64,armv7}-addon-paseo:<version>` and
-   `:latest`. amd64 and aarch64 take minutes; armv7 builds under QEMU and is
-   much slower. Users see the update once the images exist.
-5. To re-run a publish for an existing tag, use **Actions → Publish → Run
-   workflow** and enter the tag (for example `v0.10.3-2`).
+   `0.10.4-1` for a new Paseo release) and add a matching `## <version>` entry at
+   the top of `paseo/CHANGELOG.md`. Lint warns on a PR that changes shipped files
+   without a bump and fails if the changelog entry is missing. Wait for the Lint
+   and Builder checks to pass.
+2. Merge to `main`. The [Tag release](.github/workflows/tag.yaml) workflow sees the
+   new version, creates the `v<version>` tag (skipping if it exists) and starts
+   Publish.
+3. [Publish](.github/workflows/publish.yaml) checks that the tag (minus `v`) equals
+   `paseo/config.yaml` `version`, then pushes
+   `ghcr.io/farajfarook/{amd64,aarch64,armv7}-addon-paseo:<version>` and `:latest`.
+   amd64 and aarch64 take minutes; armv7 builds under QEMU and is much slower.
+4. When every image exists, Publish creates the GitHub Release with the
+   `CHANGELOG.md` section for that version as its notes
+   (`.github/scripts/release-notes.sh`).
+5. To re-run a publish for an existing tag (or add a missing Release), use
+   **Actions → Publish → Run workflow** and enter the tag (for example `v0.10.3-2`).
+   Pushing a `v*` tag by hand also works.
 
 Check a tag locally before pushing it:
 
@@ -78,9 +77,8 @@ Rules:
 
 - Never push a `v*` tag for a version that isn't in `paseo/config.yaml` on
   `main`. The guard fails and nothing is published.
-- Never merge a version bump without tagging it straight away. Until its
-  images exist, users who see the new version get "image not found" when they
-  update.
+- Merging a version bump is the release. Until the images exist, users who see the
+  new version get "image not found" when they update, so watch the Publish run.
 
 ## Bumping Paseo
 

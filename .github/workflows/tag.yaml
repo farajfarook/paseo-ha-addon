@@ -1,0 +1,61 @@
+# Tag a release when a new add-on version lands on main.
+# Runs when paseo/config.yaml changes on main. If v<version> does not exist yet,
+# it creates the tag and starts the Publish workflow for it (which builds the
+# images and then creates the GitHub Release from paseo/CHANGELOG.md).
+# Pushes made with GITHUB_TOKEN do not trigger other workflows, so Publish is
+# started explicitly with workflow_dispatch instead of relying on the tag push.
+name: Tag release
+
+on:
+  push:
+    branches: [main]
+    paths: [paseo/config.yaml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag and publish new version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: true
+
+      - name: Read version
+        id: ver
+        run: |
+          version="$(awk '/^version:/{gsub(/["\047 \r]/,"",$2);print $2;exit}' paseo/config.yaml)"
+          [[ -n "${version}" ]] || { echo "::error::no version in paseo/config.yaml"; exit 1; }
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${version}"
+
+      - name: Changelog entry must exist
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: .github/scripts/release-notes.sh "${VERSION}" > /dev/null
+
+      - name: Create tag and start Publish
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" > /dev/null; then
+            echo "Tag ${tag} already exists; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${tag}" -m "Release ${VERSION}"
+          git push origin "refs/tags/${tag}"
+          gh workflow run publish.yaml -f "tag=${tag}"
+          echo "Tagged ${tag} and started Publish."
