@@ -92,49 +92,56 @@ provider_runs() {
 }
 
 # --- Uninstall providers that are installed (per stamp) but no longer desired, or whose pins changed.
+# A deselected provider whose uninstall fails stays in the stamp so the next start retries it.
+failed_removals=""
 while IFS='=' read -r id specs; do
   [[ -z "${id}" ]] && continue
   if ! grep -qxF "${id}=${specs}" <<<"${desired}"; then
-    if ! grep -q "^${id}=" <<<"${desired}"; then
-      ph_log_info "Removing provider ${id}"
-    fi
+    deselected=false
+    grep -q "^${id}=" <<<"${desired}" || deselected=true
+    [[ "${deselected}" == true ]] && ph_log_info "Removing provider ${id}"
     # shellcheck disable=SC2086  # specs is a space-separated list
-    npm_uninstall ${specs} || ph_log_warn "Failed to uninstall provider ${id}"
+    if ! npm_uninstall ${specs}; then
+      ph_log_warn "Failed to uninstall provider ${id}; it will be retried on the next start"
+      [[ "${deselected}" == true ]] && failed_removals+="${id}=${specs}"$'\n'
+    fi
   fi
 done <<<"${current}"
 
 # --- Install each desired provider that is not already recorded with the same pins.
+# Every desired provider is checked on every start: a stamped CLI that no longer runs
+# is reinstalled instead of being trusted.
 new_stamp=""
-if [[ "${desired}" == "${current}" ]]; then
-  new_stamp="${current}"
-  [[ -n "${desired}" ]] && ph_log_info "Providers up to date: $(cut -d= -f1 <<<"${desired}" | paste -sd' ' -)"
-else
-  while IFS='=' read -r id specs; do
-    [[ -z "${id}" ]] && continue
-    if grep -qxF "${id}=${specs}" <<<"${current}" && provider_runs "${id}"; then
-      new_stamp+="${id}=${specs}"$'\n'
-      continue
-    fi
-    ph_log_info "Installing provider ${id} (${specs}) into ${AGENTS_DIR}..."
-    log="$(mktemp)"
-    # shellcheck disable=SC2086  # specs is a space-separated list
-    if [[ ",${PASEO_HA_TEST_FAIL_INSTALL:-}," != *",${id},"* ]] \
-       && npm install --prefix "${AGENTS_DIR}" --no-audit --no-fund --omit=dev --fetch-retries=1 --fetch-timeout=60000 ${specs} >"${log}" 2>&1 \
-       && PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version >>"${log}" 2>&1; then
-      ph_log_info "Installed provider ${id}: $(PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version 2>/dev/null | head -n1)"
-      new_stamp+="${id}=${specs}"$'\n'
-    else
-      ph_log_error "Provider ${id} could not be installed or does not run on $(uname -m) (it will be disabled and retried on the next start). Last output:"
-      grep -v '^[[:space:]]*$' "${log}" | tail -n 5 | while IFS= read -r line; do ph_log_error "  ${line}"; done
-      # shellcheck disable=SC2086
-      npm_uninstall ${specs} || true
-    fi
-    rm -f "${log}"
-  done <<<"${desired}"
-fi
+up_to_date=""
+while IFS='=' read -r id specs; do
+  [[ -z "${id}" ]] && continue
+  if grep -qxF "${id}=${specs}" <<<"${current}" && provider_runs "${id}"; then
+    new_stamp+="${id}=${specs}"$'\n'
+    up_to_date+="${id} "
+    continue
+  fi
+  ph_log_info "Installing provider ${id} (${specs}) into ${AGENTS_DIR}..."
+  log="$(mktemp)"
+  # shellcheck disable=SC2086  # specs is a space-separated list
+  if [[ ",${PASEO_HA_TEST_FAIL_INSTALL:-}," != *",${id},"* ]] \
+     && npm install --prefix "${AGENTS_DIR}" --no-audit --no-fund --omit=dev --fetch-retries=1 --fetch-timeout=60000 ${specs} >"${log}" 2>&1 \
+     && PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version >>"${log}" 2>&1; then
+    ph_log_info "Installed provider ${id}: $(PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version 2>/dev/null | head -n1)"
+    new_stamp+="${id}=${specs}"$'\n'
+  else
+    ph_log_error "Provider ${id} could not be installed or does not run on $(uname -m) (it will be disabled and retried on the next start). Last output:"
+    grep -v '^[[:space:]]*$' "${log}" | tail -n 5 | while IFS= read -r line; do ph_log_error "  ${line}"; done
+    # shellcheck disable=SC2086
+    npm_uninstall ${specs} || true
+  fi
+  rm -f "${log}"
+done <<<"${desired}"
+[[ -n "${up_to_date}" ]] && ph_log_info "Providers up to date: ${up_to_date% }"
 
-# Failed providers are left out of the stamp so the next start retries them.
-printf '%s' "${new_stamp}" > "${STAMP}"
+# Failed installs are left out of the stamp so the next start retries them; failed
+# removals stay in it for the same reason.
+new_stamp+="${failed_removals}"
+printf '%s' "${new_stamp%$'\n'}" > "${STAMP}"
 
 # --- Sync Paseo's provider enable flags (the add-on owns these on every start).
 # Paseo's `config set` only accepts the whole agents.providers object (dynamic keys
@@ -152,11 +159,18 @@ for id in "${ALL_PROVIDERS[@]}"; do
   fi
   flags="$(jq -c --arg id "${id}" --argjson s "${state}" '.[$id] = {enabled: $s}' <<<"${flags}")"
 done
-existing="$(paseo daemon config get agents.providers --home "${PASEO_HOME}" --json 2>/dev/null | jq -c '.value // {}' 2>/dev/null)"
-[[ -n "${existing}" ]] || existing='{}'
-merged="$(jq -cn --argjson e "${existing}" --argjson f "${flags}" '$e * $f' 2>/dev/null)"
-if [[ -n "${merged}" ]] \
-   && paseo daemon config set agents.providers "${merged}" --home "${PASEO_HOME}" >/dev/null 2>&1; then
+# A failed or unreadable read must not look like "no overrides": writing the whole object
+# back would then erase the user's other provider settings. `config get` succeeds with
+# set:false when nothing is stored, which is the only case that means an empty object.
+merged=""
+if raw="$(paseo daemon config get agents.providers --home "${PASEO_HOME}" --json 2>/dev/null)" \
+   && existing="$(jq -ce 'if .set == true then (.value | select(type == "object")) elif .set == false then {} else empty end' <<<"${raw}" 2>/dev/null)" \
+   && [[ -n "${existing}" ]]; then
+  merged="$(jq -cn --argjson e "${existing}" --argjson f "${flags}" '$e * $f' 2>/dev/null)"
+fi
+if [[ -z "${merged}" ]]; then
+  ph_log_warn "Could not read Paseo's provider settings; leaving them unchanged (the enable flags were not synced)"
+elif paseo daemon config set agents.providers "${merged}" --home "${PASEO_HOME}" >/dev/null 2>&1; then
   ph_log_info "Paseo providers enabled: ${enabled_list:-none}"
 else
   ph_log_warn "Failed to set Paseo provider enable flags; Paseo keeps its previous provider settings"

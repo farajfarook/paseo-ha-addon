@@ -146,7 +146,7 @@ The add-on SHALL expose an optional relay setting. When it is set, it SHALL forc
 - **THEN** the daemon makes no relay connection, even if relay was previously enabled in Paseo
 
 ### Requirement: Settings owned by Paseo remain editable
-The add-on SHALL NOT lock Paseo settings that Paseo's own Settings screen can edit at runtime, such as MCP injection, browser tools, providers, profiles, plugins and system prompt. Changes made there SHALL persist across add-on restarts.
+The add-on SHALL NOT lock Paseo settings that Paseo's own Settings screen can edit at runtime, such as MCP injection, browser tools, profiles, plugins and system prompt. Changes made there SHALL persist across add-on restarts. Which providers are enabled is the exception: it is owned by the add-on's `providers` option and is reapplied on every start (see the `agent-providers` capability); other per-provider settings still persist.
 
 #### Scenario: Change a setting in Paseo UI
 - **WHEN** the user changes a runtime setting (e.g. auto-archive after merge) in Paseo's Settings screen and restarts the add-on

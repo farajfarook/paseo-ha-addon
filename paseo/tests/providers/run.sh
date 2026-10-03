@@ -89,6 +89,45 @@ run_hook '["pi","claude"]'
 expect_enabled codex=false pi=true claude=true
 [[ "$(docker exec "${C}" jq -r '.agents.providers.codex.label' /data/home/.paseo/config.json)" == "Mine" ]] && pass "codex label override kept" || fail "label override lost"
 
+echo "== a stamped CLI that stopped working is reinstalled"
+run_hook '["pi","claude"]'
+docker exec "${C}" sh -c 'rm -f /data/agents/node_modules/.bin/claude; ln -s /nonexistent /data/agents/node_modules/.bin/claude'
+run_hook '["pi","claude"]'
+log_has 'Installing provider claude' && pass "broken claude reinstalled" || fail "broken claude not reinstalled"
+expect_enabled claude=true
+
+echo "== failed uninstall stays in the stamp and is retried"
+run_hook '["pi","claude"]'
+# make `npm uninstall` fail by shadowing npm on PATH for one run
+docker exec -e PROV='["pi"]' "${C}" bash -c '
+  mkdir -p /tmp/fakebin; real="$(command -v npm)"
+  printf "#!/bin/sh
+[ \"$1\" = uninstall ] && exit 1
+exec %s \"$@\"
+" "$real" > /tmp/fakebin/npm; chmod +x /tmp/fakebin/npm
+  echo "{\"providers\":${PROV}}" > /data/options.json
+  export PASEO_HOME=/data/home/.paseo PATH=/tmp/fakebin:$PATH
+  bash -c "source /usr/local/lib/paseo-ha/common.sh; source /h/20-providers.sh" > /tmp/hook.log 2>&1; echo "rc=$?" >> /tmp/hook.log'
+log_has 'Failed to uninstall provider claude' && pass "failed uninstall logged" || fail "no uninstall failure logged"
+docker exec "${C}" grep -q '^claude=' /data/agents/.paseo-ha-providers.stamp && pass "failed removal kept in the stamp" || fail "failed removal dropped from the stamp"
+expect_enabled claude=false
+run_hook '["pi"]'
+log_has 'Removing provider claude' && pass "removal retried" || fail "removal not retried"
+installed claude && fail "claude still installed" || pass "claude removed on retry"
+docker exec "${C}" grep -q '^claude=' /data/agents/.paseo-ha-providers.stamp && fail "stamp still lists claude" || pass "stamp cleared after successful removal"
+
+echo "== unreadable provider config is not overwritten"
+docker exec "${C}" bash -c 'PASEO_HOME=/data/home/.paseo; paseo daemon config set agents.providers "{\"codex\":{\"enabled\":false,\"label\":\"Keep\"}}" --home $PASEO_HOME >/dev/null; cp $PASEO_HOME/config.json /tmp/config.before'
+docker exec "${C}" bash -c 'export PASEO_HOME=/data/home/.paseo; echo "{\"providers\":[\"pi\"]}" > /data/options.json
+  mkdir -p /tmp/badbin; printf "#!/bin/sh
+[ \"$2\" = config ] && [ \"$3\" = get ] && { echo not-json; exit 1; }
+exec %s \"$@\"
+" "$(command -v paseo)" > /tmp/badbin/paseo; chmod +x /tmp/badbin/paseo
+  PATH=/tmp/badbin:$PATH bash -c "source /usr/local/lib/paseo-ha/common.sh; source /h/20-providers.sh" > /tmp/hook.log 2>&1; echo "rc=$?" >> /tmp/hook.log'
+log_has "Could not read Paseo's provider settings" && pass "read failure warned" || fail "no read-failure warning"
+docker exec "${C}" cmp -s /tmp/config.before /data/home/.paseo/config.json && pass "provider config left untouched" || fail "provider config was rewritten"
+hook_rc_ok && pass "hook exits 0" || fail "hook exit"
+
 echo "== unknown provider ignored"
 run_hook '["pi","nope"]'
 log_has "Unknown provider 'nope'" && pass "unknown value warned" || fail "no warning"

@@ -434,7 +434,7 @@ session.
 - **Paseo's Pair-device and share links do not point at the ingress URL**, so the mobile and
   desktop apps connect through the relay or the direct port rather than through the sidebar
   panel.
-- **Oh My Pi (`omp`) does not run on the Alpine (musl) images.** Its native addon is
+- **Oh My Pi (`omp`) does not run on the Alpine (musl) images.** Its native add-on is
   published for glibc only (the aarch64 package has no musl build either) and refuses to
   load on musl, even with `gcompat` (checked on amd64). Selecting `omp`
   is safe: the install is attempted, the failure is logged and Oh My Pi stays disabled.
