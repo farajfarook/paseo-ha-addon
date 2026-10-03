@@ -43,7 +43,7 @@ trap cleanup EXIT
 
 options() { # options <git_snapshot> <workspace>
   cat > "${WORK}/data/options.json" <<EOF
-{"workspace":"$2","git_snapshot":$1,"agents":[],"env_vars":[{"name":"MY_SECRET","value":"${SECRET}"}],
+{"workspace":"$2","git_snapshot":$1,"providers":["pi"],"env_vars":[{"name":"MY_SECRET","value":"${SECRET}"}],
  "hostnames":[],"log_level":"info","dictation":false,"voice_mode":false,"speech_provider":"local"}
 EOF
 }

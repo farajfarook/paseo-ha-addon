@@ -106,3 +106,6 @@ jobs:
 
       - name: Run direct-port test
         run: paseo/tests/direct-port/run.sh paseo-smoke:ci
+
+      - name: Run providers test
+        run: paseo/tests/providers/run.sh paseo-smoke:ci

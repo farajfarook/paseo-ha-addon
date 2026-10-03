@@ -1,7 +1,7 @@
 {
   "workspace": "/homeassistant",
   "git_snapshot": false,
-  "agents": [],
+  "providers": ["pi"],
   "env_vars": [],
   "hostnames": [],
   "log_level": "info",

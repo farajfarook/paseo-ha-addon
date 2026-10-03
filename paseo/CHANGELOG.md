@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.3-5
+
+- **BREAKING:** the `agents` option is replaced by `providers`, a multi-select of Paseo's six providers (`claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`) that defaults to `[pi]`. There is no migration: remove and reinstall the add-on, then pick your providers again.
+- Selected providers are installed and enabled in Paseo on every start; deselected providers are uninstalled and disabled. Pi stays built into the image and can now be switched off.
+- Added GitHub Copilot CLI and Oh My Pi as providers. Oh My Pi cannot load its native addon on the Alpine (musl) images yet, so it is disabled with a logged error.
+- Bundled Paseo **0.10.3** and Pi **1.0.0** are unchanged.
+
 ## 0.10.3-3
 
 - Drop the `armv7` (32-bit ARM) image. Home Assistant no longer supports 32-bit systems (Core 2025.12, Home Assistant OS 17), and the image took far too long to build under emulation. Raspberry Pi 3 and 4 users need the 64-bit Home Assistant OS image, which uses `aarch64`.

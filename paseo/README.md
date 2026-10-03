@@ -4,7 +4,7 @@
 ![Supports amd64 Architecture][amd64-shield]
 
 Configure Home Assistant with coding agents. [Paseo](https://paseo.sh) runs Pi
-(bundled), Claude Code, Codex and OpenCode behind a daemon with a web UI, opened
+(bundled), Claude, Codex, Copilot, OpenCode and Oh My Pi, chosen in one option, behind a daemon with a web UI, opened
 from the Home Assistant sidebar and authenticated by Home Assistant.
 
 - Opens as **Paseo** in the sidebar via Ingress — no ports, tokens or pairing.
