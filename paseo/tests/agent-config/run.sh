@@ -11,6 +11,8 @@
 # Optional: AGENTS_DIR=<host dir with node_modules from
 #   npm install --prefix <dir> @anthropic-ai/claude-code @openai/codex opencode-ai>
 # to also check the Claude Code/Codex/OpenCode MCP entries.
+# Section 8 covers the default Pi packages (36-pi-packages.sh) against a mock npm registry
+# (mock-registry.js + fixtures/), so it needs no network.
 # Uses names prefixed with $PREFIX (default: agentcfg-test) and cleans up after itself.
 # ==============================================================================
 set -uo pipefail
@@ -23,18 +25,19 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/${PREFIX}.XXXXXX")"
 NET="${PREFIX}-net"
 APP="${PREFIX}-app"
 SUP="${PREFIX}-sup"
+REG="${PREFIX}-reg"
 TOKEN="test-supervisor-token"
 SECRET="s3cr3t-value-$$"
 fails=0
 
 hostpath() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else echo "$1"; fi; }
 pass() { echo "PASS: $*"; }
-fail() { echo "FAIL: $*"; fails=$((fails + 1)); }
+fail() { echo "FAIL: $*"; fails=$((fails + 1)); if [[ -n "${DEBUG:-}" ]]; then last_start_log | grep -i -E 'pi package|pi-package|WARN|ERROR' | tail -n 12 | sed 's/^/    | /'; docker exec "${APP}" bash -c 'cat /data/paseo-ha/pi-packages.offered 2>&1; pi list 2>&1' | sed 's/^/    > /'; fi; }
 check() { local desc="$1"; shift; if "$@" >/dev/null 2>&1; then pass "${desc}"; else fail "${desc}"; fi; }
 in_app() { docker exec "${APP}" bash -c "source /run/paseo-ha/daemon.env; $1"; }
 
 cleanup() {
-  docker rm -f "${APP}" "${SUP}" >/dev/null 2>&1
+  docker rm -f "${APP}" "${SUP}" "${REG}" >/dev/null 2>&1
   docker network rm "${NET}" >/dev/null 2>&1
   docker run --rm -v "$(hostpath "${WORK}"):/w" --entrypoint sh "${IMAGE}" -c 'rm -rf /w/*' >/dev/null 2>&1
   rm -rf "${WORK}"
@@ -58,10 +61,12 @@ start_sup() { # start_sup <200|404>
 start_app() {
   docker rm -f "${APP}" >/dev/null 2>&1
   local extra=()
-  [[ -n "${AGENTS_DIR:-}" ]] && extra=(-v "$(hostpath "${AGENTS_DIR}"):/data/agents")
+  [[ -n "${PI_BUDGET:-}" ]] && extra+=(-e "PASEO_HA_PI_BUDGET=${PI_BUDGET}")   # test seam for the install time budget
+  [[ -n "${AGENTS_DIR:-}" ]] && extra+=(-v "$(hostpath "${AGENTS_DIR}"):/data/agents")
   docker run -d --name "${APP}" --network "${NET}" -e SUPERVISOR_TOKEN="${TOKEN}" \
     -v "$(hostpath "${WORK}/data"):/data" -v "$(hostpath "${WORK}/ha"):/homeassistant" \
     -v "$(hostpath "${WORK}/config"):/config" -v "$(hostpath "${WORK}/share"):/share" \
+    -v "$(hostpath "${WORK}/pidef"):/pidef" -e PASEO_HA_PI_DEFAULTS=/pidef/list -e npm_config_registry=http://registry \
     "${extra[@]}" "${IMAGE}" >/dev/null
   wait_ready
 }
@@ -90,13 +95,23 @@ wait_ready() { # [previous start count] -> until a new start's bootstrap oneshot
   echo "app did not become ready"; docker logs "${APP}" 2>&1 | grep -E '^(s6-rc|\[paseo-ha\]|\[[0-9:]+\] )' | tail -30; exit 1
 }
 
-mkdir -p "${WORK}"/{data,ha,config,share}
+mkdir -p "${WORK}"/{data,ha,config,share,pidef,registry}
+: > "${WORK}/pidef/list"
 printf 'homeassistant:\n  name: Test\nautomation: !include automations.yaml\n' > "${WORK}/ha/configuration.yaml"
 echo '[]' > "${WORK}/ha/automations.yaml"
 echo 'pw: hunter2-secret' > "${WORK}/ha/secrets.yaml"
 mkdir -p "${WORK}/ha/.storage" && echo '{}' > "${WORK}/ha/.storage/core.config"
 touch "${WORK}/ha/home-assistant_v2.db"
 docker network create "${NET}" >/dev/null
+
+# Mock npm registry for the Pi-package scenarios: pack the fixtures with the image's npm.
+pack_fixture() { # pack_fixture <name> [version]  -> registry/<name>-<version>.tgz
+  local name="$1" version="${2:-1.0.0}"
+  docker run --rm -v "$(hostpath "${HERE}/fixtures"):/f:ro" -v "$(hostpath "${WORK}/registry"):/r" --entrypoint sh "${IMAGE}" -c     "rm -rf /tmp/p && cp -r /f/${name} /tmp/p && sed -i 's/\"version\": \"1.0.0\"/\"version\": \"${version}\"/' /tmp/p/package.json && cd /tmp/p && npm pack --pack-destination /r >/dev/null"
+}
+for n in a b c d f g; do pack_fixture "paseo-test-${n}"; done
+pack_fixture paseo-test-a 1.1.0
+docker run -d --name "${REG}" --network "${NET}" --network-alias registry -e REGISTRY_DIR=/registry   -v "$(hostpath "${WORK}/registry"):/registry" -v "$(hostpath "${HERE}"):/t" --entrypoint node "${IMAGE}" /t/mock-registry.js >/dev/null
 
 # --- 1. First start: seeding, links, instructions, MCP (200), bootstrap -------
 options false /homeassistant
@@ -183,6 +198,79 @@ echo "# user" >> "${WORK}/ha/.gitignore"
 restart_app
 check "existing repo left unchanged" test "$(in_app 'git -C /homeassistant rev-parse HEAD')" = "${head_before}"
 check "existing .gitignore kept" grep -qx "# user" "${WORK}/ha/.gitignore"
+
+# --- 8. Default Pi packages (36-pi-packages.sh) ---------------------------------
+set_defaults() { printf 'npm:%s\n' "$@" > "${WORK}/pidef/list"; }   # one default per line
+pi_list() { in_app 'pi list 2>/dev/null'; }
+has_pkg() { local list; list="$(pi_list)"; grep -Eq "npm:$1(@| |$)" <<<"${list}"; }   # no pipe: grep -q + pipefail
+no_pkg() { ! has_pkg "$1"; }
+all_pkgs() { local p list; list="$(pi_list)"; for p in "$@"; do grep -Eq "npm:${p}(@| |$)" <<<"${list}" || return 1; done; }
+in_ledger() { local p; for p in "$@"; do grep -qx "npm:${p}" "${WORK}/data/paseo-ha/pi-packages.offered" || return 1; done; }
+not_in_ledger() { ! in_ledger "$1"; }
+installed_version() { in_app "jq -r .version \$PI_CODING_AGENT_DIR/npm/node_modules/$1/package.json"; }
+no_install_attempts() { [[ -z "$(last_start_log | grep -E 'Installing default Pi package|Could not install default')" ]]; }
+
+set_defaults paseo-test-a@1.0.0 paseo-test-b@1.0.0
+restart_app
+check "defaults installed on first offer" all_pkgs paseo-test-a paseo-test-b
+check "ledger records both defaults" in_ledger paseo-test-a paseo-test-b
+check "start log lists Pi packages" test -n "$(last_start_log | grep 'Pi packages:.*paseo-test-a')"
+
+restart_app
+check "restart does not reinstall" no_install_attempts
+
+in_app 'pi remove npm:paseo-test-b >/dev/null 2>&1; pi install npm:paseo-test-c >/dev/null 2>&1'
+restart_app
+check "removed default stays removed" no_pkg paseo-test-b
+check "user-installed package persists" has_pkg paseo-test-c
+check "remaining default kept" has_pkg paseo-test-a
+check "no installs after user changes" no_install_attempts
+
+set_defaults paseo-test-a@1.0.0 paseo-test-b@1.0.0 paseo-test-d@1.0.0
+restart_app
+check "new default is installed once" has_pkg paseo-test-d
+check "removed default still absent after list grows" no_pkg paseo-test-b
+
+set_defaults paseo-test-a@1.1.0 paseo-test-b@1.0.0 paseo-test-d@1.0.0
+restart_app
+check "version-only change does not reinstall" no_install_attempts
+check "installed version unchanged" test "$(installed_version paseo-test-a)" = 1.0.0
+
+in_app 'pi install npm:paseo-test-f >/dev/null 2>&1'
+set_defaults paseo-test-a@1.1.0 paseo-test-b@1.0.0 paseo-test-d@1.0.0 paseo-test-f@1.0.0
+restart_app
+check "default the user already installed: no install run" no_install_attempts
+check "...but it is recorded as offered" in_ledger paseo-test-f
+
+# Image update = a new container on the same /data.
+docker rm -f "${APP}" >/dev/null 2>&1
+start_app
+check "after container recreate: user + default packages kept" all_pkgs paseo-test-a paseo-test-c paseo-test-d paseo-test-f
+check "after container recreate: removed default still absent" no_pkg paseo-test-b
+check "after container recreate: nothing reinstalled" no_install_attempts
+
+# A broken source warns, never blocks startup, and is retried until it works.
+set_defaults paseo-test-a@1.1.0 paseo-test-e@1.0.0
+restart_app
+check "unavailable default: warning logged" test -n "$(last_start_log | grep 'Could not install default Pi package npm:paseo-test-e')"
+check "unavailable default: not recorded" not_in_ledger paseo-test-e
+check "unavailable default: daemon still healthy" in_app 'curl -fs http://127.0.0.1:6767/api/health'
+pack_fixture paseo-test-e
+restart_app
+check "retried and installed once available" has_pkg paseo-test-e
+check "...then recorded" in_ledger paseo-test-e
+
+# The shared time budget stops installs and defers the rest to the next start.
+set_defaults paseo-test-a@1.1.0 paseo-test-e@1.0.0 paseo-test-g@1.0.0
+docker rm -f "${APP}" >/dev/null 2>&1
+PI_BUDGET=0 start_app
+check "budget used up: warning names the deferral" test -n "$(last_start_log | grep 'time budget')"
+check "budget used up: daemon still healthy" in_app 'curl -fs http://127.0.0.1:6767/api/health'
+check "budget used up: deferred default not recorded" not_in_ledger paseo-test-g
+docker rm -f "${APP}" >/dev/null 2>&1
+PI_BUDGET= start_app
+check "next start installs the deferred default" has_pkg paseo-test-g
+check "...and records it" in_ledger paseo-test-g
 
 # --- 7. Secrets ----------------------------------------------------------------
 check "no secrets/credentials in /config" in_app '! grep -rq -e "'"${SECRET}"'" -e "'"${TOKEN}"'" /config && [ -z "$(find /config \( -name "*.json" -o -name "*auth*" -o -name "*key*" -o -name "*session*" \) -print)" ]'
