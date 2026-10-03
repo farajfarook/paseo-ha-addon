@@ -7,7 +7,7 @@ Configuring Home Assistant (YAML, automations, scripts, dashboards, add-on confi
 ## What Changes
 
 - Publish this directory as the public GitHub repo `farajfarook/paseo-ha-addon` and turn it into a Home Assistant **add-on repository** (`repository.yaml`) containing a single `paseo` add-on.
-- Package the Paseo daemon + bundled web UI (pinned `@getpaseo/cli` / `@getpaseo/server` release) into a multi-arch add-on image for `aarch64`, `amd64` and `armv7` on Home Assistant base images.
+- Package the Paseo daemon + bundled web UI (pinned `@getpaseo/cli` / `@getpaseo/server` release) into a multi-arch add-on image for `aarch64` and `amd64` on Home Assistant base images (`armv7` was originally included and dropped in 0.10.3-3; see design.md).
 - Expose the Paseo web UI through **HA Ingress** with `panel_icon`/`panel_title` so it appears as a "Paseo" entry in the HA side menu and opens as an embedded web application. HA's login is the only authentication on this path; the daemon itself only listens on loopback.
 - Add an ingress adapter (reverse proxy inside the container) that makes Paseo's root-path web app, `/api/*` calls and `/ws` WebSocket work under HA's dynamic `/api/hassio_ingress/<token>/` prefix.
 - Bundle the **Pi coding agent harness** (`@earendil-works/pi-coding-agent`) in the image so Paseo has a working provider out of the box, and let users opt in to additional agent CLIs (Claude Code, Codex, OpenCode) via add-on options, installed persistently.
@@ -38,4 +38,4 @@ Configuring Home Assistant (YAML, automations, scripts, dashboards, add-on confi
 - **External dependencies**: Home Assistant Supervisor/Ingress, HA base images, Node.js ≥ 22.19, `@getpaseo/cli` (Apache-2.0), `@earendil-works/pi-coding-agent`, optional `@anthropic-ai/claude-code`, `@openai/codex`, `opencode-ai`, nginx.
 - **Upstream coupling**: Paseo's web UI assumes it is served from `/` and connects to `<host>:<port>/ws`; the ingress adapter depends on that behaviour and must be re-verified on every Paseo version bump.
 - **Security**: agents run as root with read-write access to the HA config and all add-on configs, a Core API token and the Supervisor `manager` role (they can restart Core and manage add-ons). The add-on relies on HA authentication for ingress. Documentation must make the trust model explicit and recommend backups and git snapshots.
-- **Platform risk**: `armv7` is deprecated by Home Assistant and some agent CLIs/native modules may not ship 32-bit ARM builds; support there is best-effort.
+- **Platform risk**: `armv7` is not supported. Home Assistant deprecated 32-bit systems in 2025 and dropped them from Core 2025.12 and Home Assistant OS 17, and the QEMU build was too slow to publish reliably. Raspberry Pi 3/4 users need the 64-bit HAOS image (`aarch64`).

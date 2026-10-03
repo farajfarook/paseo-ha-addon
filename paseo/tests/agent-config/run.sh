@@ -277,6 +277,39 @@ check "no secrets/credentials in /config" in_app '! grep -rq -e "'"${SECRET}"'" 
 check "no secret values in agent configs" in_app '! grep -rqs -e "'"${TOKEN}"'" $CLAUDE_CONFIG_DIR/.claude.json $CODEX_HOME/config.toml $XDG_CONFIG_HOME/opencode/opencode.json $PI_CODING_AGENT_DIR/mcp.json'
 check "no secret values in add-on log" test "$(docker logs "${APP}" 2>&1 | grep -c -e "${SECRET}" -e "${TOKEN}")" = 0
 
+# --- 8. Speech guard (task 10.1) -----------------------------------------------
+# The local engine cannot load on the Alpine image, so dictation/voice must be forced
+# off (no model download). With speech_provider openai nothing is guarded.
+# speech_options <speech_provider> <dictation true|false> <voice_mode true|false>
+# (sed on a known options shape: the host may not have jq)
+speech_options() {
+  sed -i -e "s/\"dictation\":[a-z]*/\"dictation\":$2/" -e "s/\"voice_mode\":[a-z]*/\"voice_mode\":$3/" \
+    -e "s/\"speech_provider\":\"[a-z]*\"/\"speech_provider\":\"$1\"/" "${WORK}/data/options.json"
+}
+# One flag on at a time: the guard must force that flag off (a regression could cover just one).
+speech_options local true false
+restart_app
+check "local speech, dictation only: dictation forced off" in_app '[ "$PASEO_DICTATION_ENABLED" = false ]'
+check "local speech, dictation only: voice mode stays off" in_app '[ "$PASEO_VOICE_MODE_ENABLED" = false ]'
+check "local speech, dictation only: warning logged" test "$(last_start_log | grep -c "no speech models are downloaded")" -ge 1
+speech_options local false true
+restart_app
+check "local speech, voice only: voice mode forced off" in_app '[ "$PASEO_VOICE_MODE_ENABLED" = false ]'
+check "local speech, voice only: dictation stays off" in_app '[ "$PASEO_DICTATION_ENABLED" = false ]'
+check "local speech, voice only: warning logged" test "$(last_start_log | grep -c "no speech models are downloaded")" -ge 1
+speech_options local true true
+restart_app
+check "local speech unavailable: dictation forced off" in_app '[ "$PASEO_DICTATION_ENABLED" = false ]'
+check "local speech unavailable: voice mode forced off" in_app '[ "$PASEO_VOICE_MODE_ENABLED" = false ]'
+check "local speech unavailable: warning names the fix" test "$(last_start_log | grep -c "no speech models are downloaded")" -ge 1
+check "local speech unavailable: no models directory" in_app '[ ! -e "$PASEO_HOME/models/local-speech" ]'
+speech_options openai true true
+restart_app
+check "openai speech: dictation stays on" in_app '[ "$PASEO_DICTATION_ENABLED" = true ]'
+check "openai speech: voice mode stays on" in_app '[ "$PASEO_VOICE_MODE_ENABLED" = true ]'
+check "openai speech: no unavailable warning" test "$(last_start_log | grep -c "cannot load on this platform")" = 0
+check "openai speech: no models directory" in_app '[ ! -e "$PASEO_HOME/models/local-speech" ]'
+
 echo
 if [[ "${fails}" -eq 0 ]]; then echo "ALL PASSED"; else echo "${fails} FAILED"; fi
 exit $(( fails > 0 ))
