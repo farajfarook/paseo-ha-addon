@@ -93,7 +93,11 @@ ph_env_set PASEO_VOICE_STT_PROVIDER "${SPEECH_PROVIDER}"
 ph_env_set PASEO_VOICE_TTS_PROVIDER "${SPEECH_PROVIDER}"
 if [[ "${SPEECH_PROVIDER}" == "local" ]] && { [[ "${DICTATION}" == "true" ]] || [[ "${VOICE}" == "true" ]]; }; then
   if ! paseo-ha-speech-check >/dev/null 2>&1; then
-    ph_log_warn "Local speech engine (sherpa-onnx-node) cannot load on this platform ($(uname -m)). Dictation/voice will be unavailable; set speech_provider to 'openai' and add OPENAI_API_KEY to env_vars instead."
+    # Turn both features off: otherwise the daemon would still download ~0.6-1 GB of
+    # models that the engine cannot load. Later ph_env_set calls override the ones above.
+    ph_env_set PASEO_DICTATION_ENABLED false
+    ph_env_set PASEO_VOICE_MODE_ENABLED false
+    ph_log_warn "Local speech engine (sherpa-onnx-node) cannot load on this platform ($(uname -m)). Dictation and voice mode are turned off and no speech models are downloaded; set speech_provider to 'openai' and add OPENAI_API_KEY to env_vars instead."
   else
     ph_log_info "Local speech enabled: models (~0.6-1 GB) are downloaded once into ${PASEO_HOME}/models/local-speech"
   fi

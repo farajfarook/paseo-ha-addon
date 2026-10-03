@@ -127,8 +127,8 @@ survives restarts and updates, and is part of `/data` backups.
 
 - Turn them on individually with `dictation` and `voice_mode`.
 - On the Alpine-based images shipped here the local engine may not load (the prebuilt
-  ONNX runtime binary is glibc-linked). The daemon still starts; the add-on log tells you
-  when local speech is unavailable on your architecture. Use
+  ONNX runtime binary is glibc-linked). In that case the add-on turns dictation and voice
+  mode off, downloads no models, and logs a warning; the daemon still starts. Use
   `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars` instead — then nothing is
   downloaded and speech runs on OpenAI's servers.
 - Turn detection for voice mode always runs locally and stays tiny.
@@ -376,7 +376,7 @@ Open the add-on **Log** tab. The daemon's own output is there too.
 |---|---|
 | `Port 6767 is mapped but no password is set; the daemon stays loopback-only` | Set `password` to enable direct access, or unmap the port. |
 | `A password is set but port 6767 is not mapped...` | Harmless: the password only applies to the direct port. Ingress never asks for it. |
-| `Local speech engine (sherpa-onnx-node) cannot load on this platform` | Use `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars`. |
+| `Local speech engine (sherpa-onnx-node) cannot load on this platform` | Dictation and voice mode were turned off and nothing was downloaded. Use `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars`. |
 | `Agent <name> could not be installed or does not run on <arch>` | That optional agent is not offered. Pi and the other agents still work. |
 | `Skill '<name>' ... has the same name as a Paseo built-in skill; skipped` | Rename your skill folder so Paseo's own skill sync cannot conflict. |
 | `Moved existing <dir> to <dir>.paseo-ha-backup-...` | A real tool folder was in the way of a `/config` link. Move your files into `/config` and delete the backup. |
