@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.3-2
+
+- Fix the Paseo web UI stalling on a blank page under Home Assistant Ingress. The ingress adapter injected its shim tag into the JavaScript bundle as well as the HTML page, which broke the bundle with a syntax error. The shim is now injected into HTML responses only.
+- Keep the app's routes working while it boots under Ingress, and rewrite file download links so downloads work through Ingress.
+
 ## 0.10.3-1
 
 First release of the Paseo add-on.
