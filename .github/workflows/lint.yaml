@@ -24,3 +24,25 @@ jobs:
         with:
           path: ./paseo
           community: false
+
+  documentation:
+    name: Documentation and pins
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # Options coverage in DOCS.md, translations, CHANGELOG/version and the
+      # Paseo/Pi pins agreeing across build.yaml, Dockerfile and config.yaml.
+      - name: Run documentation checks
+        run: bash paseo/tests/docs/run.sh
+
+      # Ingress anchors of the pinned Paseo release: fails if the web UI stops
+      # exposing an asset path, the "/ws" path or the connection hint that the
+      # nginx sub_filter rules and shim depend on (see README 'Bumping Paseo').
+      - name: Check the ingress anchors of the pinned Paseo
+        run: |
+          pin="$(awk '/^ *PASEO_VERSION:/{print $2; exit}' paseo/build.yaml)"
+          bash .github/scripts/paseo-anchors.sh --check "${pin}"
