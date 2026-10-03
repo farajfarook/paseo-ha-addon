@@ -64,8 +64,8 @@
 
 ## 6. Direct port and auth
 
-- [ ] 6.1 In `init-paseo`, if port 6767 is mapped and `password` is set, listen on `0.0.0.0:6767` with `PASEO_PASSWORD` and `PASEO_HOSTNAMES` from `hostnames`, and configure nginx to add `Authorization: Bearer` and the `paseo.bearer.<pw>` WS subprotocol upstream. Verify that the ingress UI still works without a prompt and a direct `curl <host>:6767/api/...` without a bearer returns 401
-- [ ] 6.2 If the port is mapped without a password, keep loopback-only and log a warning. Verify that the direct port refuses connections and the warning appears in the log
+- [x] 6.1 In `init-paseo`, if port 6767 is mapped and `password` is set, listen on `0.0.0.0:6767` with `PASEO_PASSWORD` and `PASEO_HOSTNAMES` from `hostnames`, and configure nginx to add `Authorization: Bearer` and the `paseo.bearer.<pw>` WS subprotocol upstream. Verify that the ingress UI still works without a prompt and a direct `curl <host>:6767/api/...` without a bearer returns 401
+- [x] 6.2 If the port is mapped without a password, keep loopback-only and log a warning. Verify that the direct port refuses connections and the warning appears in the log
 - [ ] 6.3 Verify the Paseo CLI connects via `paseo project ls --host <ha-host>:6767` with the password and a custom hostname from `hostnames` is accepted
 
 ## 7. Documentation
