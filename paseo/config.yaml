@@ -11,7 +11,7 @@ init: false
 image: ghcr.io/farajfarook/{arch}-addon-paseo
 ingress: true
 panel_title: Paseo
-panel_icon: mdi:robot-outline
+panel_icon: robot-outline
 ports:
   6767/tcp: null
 ports_description:
@@ -56,5 +56,5 @@ schema:
   dictation: bool
   voice_mode: bool
   speech_provider: list(local|openai)
-  # worktrees_root removed on purpose (CI negative test)
+  worktrees_root: str?
   relay: bool?
