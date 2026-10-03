@@ -34,9 +34,6 @@ jobs:
             platform: linux/arm/v7
             qemu: true
     env:
-      # build-image calls docker/build-push-action without `platforms`, so buildx
-      # builds for DOCKER_DEFAULT_PLATFORM (armv7 runs under QEMU).
-      DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
       IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-paseo
     steps:
       - name: Check out code
@@ -44,6 +41,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # NOTE: DOCKER_DEFAULT_PLATFORM must NOT be set here. It would make the
+      # `docker pull` of the multi-arch binfmt image resolve linux/arm/v7 on this
+      # amd64 runner, and the action then fails with "exec format error". It is
+      # set on the build step only, where the arm/v7 base image is what we want.
       - name: Set up QEMU
         if: matrix.qemu
         uses: docker/setup-qemu-action@v4
@@ -69,6 +70,10 @@ jobs:
           cat "$GITHUB_OUTPUT"
 
       - name: Build image (test, no push)
+        env:
+          # build-image calls docker/build-push-action without `platforms`, so buildx
+          # builds for DOCKER_DEFAULT_PLATFORM (armv7 runs under QEMU).
+          DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         uses: home-assistant/builder/actions/build-image@2026.09.0
         with:
           arch: ${{ matrix.arch }}

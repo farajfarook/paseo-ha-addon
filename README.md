@@ -81,3 +81,65 @@ Rules:
 - Never merge a version bump without tagging it straight away. Until its
   images exist, users who see the new version get "image not found" when they
   update.
+
+## Bumping Paseo
+
+The add-on does not fork Paseo. Its ingress adapter rewrites what the upstream web UI
+emits, so it depends on Paseo internals: root-absolute asset paths, the hard-coded `/ws`
+WebSocket path, the `window.__PASEO_INITIAL_DAEMON_CONNECTION__` hint and the
+`paseo.bearer.<token>` subprotocol. A version bump that moves one of those silently breaks
+the sidebar panel. Check them **before** raising the pin.
+
+1. **Check the anchors of the candidate release** against the pinned one:
+
+   ```bash
+   ./.github/scripts/paseo-anchors.sh --diff <current> <candidate>   # e.g. --diff 0.10.3 0.11.0
+   ```
+
+   It downloads `@getpaseo/server` and `@getpaseo/protocol` for both versions and diffs a
+   report of every fact the adapter relies on. Non-zero exit means an anchor moved. Use
+   `.github/scripts/paseo-anchors.sh --installed` to print the report for the tree already
+   installed.
+
+2. **Diff the upstream sources** for the same files, plus the exported app shell, to see
+   *why* something moved (paths are the same when only behaviour changed):
+
+   ```bash
+   BASE=https://raw.githubusercontent.com/getpaseo/paseo
+   for tag in v0.10.2 v0.10.3; do           # the two versions you are comparing
+     for f in packages/server/src/server/web-ui.ts \
+              packages/protocol/src/daemon-endpoints.ts; do
+       curl -fsSL -o "/tmp/$(basename "$f").$(tr . _ <<<"$tag")" "$BASE/$tag/$f"
+     done
+   done
+   diff -u /tmp/web-ui.ts.v0_10_2 /tmp/web-ui.ts.v0_10_3
+   diff -u /tmp/daemon-endpoints.ts.v0_10_2 /tmp/daemon-endpoints.ts.v0_10_3
+   ```
+
+   In the published package the exported `web-ui/index.html` and the bundle carry the same
+   asset paths, and their file names are content-hashed - that is normal and is not an
+   anchor change (the anchors report ignores hashes).
+
+3. **If an anchor moved**, update the adapter before anything else:
+   - `paseo/rootfs/opt/paseo-ha/nginx/paseo.conf.tpl` - the `sub_filter` list of
+     root-absolute strings and the shim injection point.
+   - `paseo/rootfs/opt/paseo-ha/www/shim.js` - the hint global, the `/ws` rewrite, the
+     `/api/`, `/mcp/`, `/public/` fetch prefixes and the history/location mapping.
+   - `paseo/rootfs/opt/paseo-ha/nginx/render.js` - the bearer header and WS subprotocol
+     used for the direct-port password (design D4).
+   - Record the new Paseo version's facts in `openspec/changes/.../design.md` D3.
+
+4. **Re-pin and document**: `PASEO_VERSION` in `paseo/Dockerfile` and `paseo/build.yaml`
+   (both must match), `PI_VERSION`/`HA_CLI_VERSION` if they move with it, the add-on
+   `version` in `paseo/config.yaml`, and a new `paseo/CHANGELOG.md` entry naming the Paseo
+   version.
+
+5. **Prove it works**: build amd64 and run the suites - `paseo/tests/smoke/run.sh` (curl
+   level through the ingress adapter), `paseo/tests/agent-config/run.sh` and, when the
+   adapter changed, `paseo/tests/ingress/run.sh` (browser behind a mock ingress). CI runs
+   the same smoke test on every PR; **a bump is not done until that job passes.**
+
+Baseline for the pinned release: `paseo-anchors.sh --diff 0.10.2 0.10.3` and
+`--diff 0.10.3 0.11.0-beta.3` both report no anchor change, and `web-ui.ts` /
+`daemon-endpoints.ts` are byte-identical between `v0.10.2`, `v0.10.3` and
+`v0.11.0-beta.3`.
