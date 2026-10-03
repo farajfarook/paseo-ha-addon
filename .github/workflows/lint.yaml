@@ -47,6 +47,13 @@ jobs:
           pin="$(awk '/^ *PASEO_VERSION:/{print $2; exit}' paseo/build.yaml)"
           bash .github/scripts/paseo-anchors.sh --check "${pin}"
 
+      # The `providers` option must list exactly the built-in providers of the
+      # pinned Paseo, so the Configuration tab and Paseo's provider list agree.
+      - name: Check the providers option against the pinned Paseo
+        run: |
+          pin="$(awk '/^ *PASEO_VERSION:/{print $2; exit}' paseo/build.yaml)"
+          bash .github/scripts/check-providers.sh "${pin}" paseo/config.yaml
+
   # Warn when add-on files change without a version bump: users only receive a
   # change once `version` in paseo/config.yaml is bumped (and tagged).
   version-bump:

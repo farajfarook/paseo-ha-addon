@@ -51,7 +51,7 @@ ccurl() { local c="$1"; shift; docker exec "${c}" curl -sS --max-time 10 "$@"; }
 start_addon() { # $1 = password ("" for none)
   docker rm -f "${ADDON}" >/dev/null 2>&1 || true
   if [[ -n "$1" ]]; then pw=',"password":"'"$1"'"'; else pw=""; fi
-  printf '{"workspace":"/homeassistant","git_snapshot":false,"agents":[],"env_vars":[],"hostnames":[],"log_level":"info","dictation":false,"voice_mode":false,"speech_provider":"local"%s}' "${pw}" > "${WORK}/options.json"
+  printf '{"workspace":"/homeassistant","git_snapshot":false,"providers":["pi"],"env_vars":[],"hostnames":[],"log_level":"info","dictation":false,"voice_mode":false,"speech_provider":"local"%s}' "${pw}" > "${WORK}/options.json"
   docker create --name "${ADDON}" --network "${NET}" --ip "${ADDON_IP}" \
     -e PASEO_HA_DIRECT_PORT=6767 "${IMAGE}" >/dev/null
   local d="${WORK}/data"; rm -rf "${d}"; mkdir -p "${d}"; cp "${WORK}/options.json" "${d}/options.json"

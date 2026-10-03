@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.3-5
+
+- **BREAKING:** the `agents` option is replaced by `providers`, a multi-select of Paseo's six providers (`claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`) that defaults to `[pi]`. There is no migration: remove and reinstall the add-on, then pick your providers again.
+- Selected providers are installed and enabled in Paseo on every start; deselected providers are uninstalled and disabled. Pi stays built into the image and can now be switched off.
+- Added GitHub Copilot CLI and Oh My Pi as providers. Oh My Pi cannot load its native add-on on the Alpine (musl) images yet, so it is disabled with a logged error.
+- Bundled Paseo **0.10.3** and Pi **1.0.0** are unchanged.
+
 ## 0.10.3-4
 
 - Stop downloading speech models that cannot be used. With `dictation` or `voice_mode` on and `speech_provider: local`, the Alpine image cannot load the local speech engine, but the daemon still downloaded about 790 MB of models. The add-on now turns both features off in that case, downloads nothing, and logs a warning that points to `speech_provider: openai`.
