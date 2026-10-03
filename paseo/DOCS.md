@@ -2,7 +2,6 @@
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
-![Supports armv7 Architecture][armv7-shield]
 
 Configure Home Assistant with coding agents.
 
@@ -43,7 +42,7 @@ add-ons you enable in the configuration.
    device.
 3. Open **Show in sidebar** and **Start**. Options can be left at their defaults.
 4. The **Paseo** entry appears in the HA side menu once the daemon is healthy — usually
-   well under a minute on amd64/aarch64, and a bit longer on armv7.
+   well under a minute on amd64/aarch64.
 
 Updating works like any other add-on: **Update** in the Add-on Store. `/data` (Paseo
 state, agent logins, installed agents) survives updates and is included in HA backups.
@@ -362,14 +361,12 @@ people you trust with your home, and review agent commits.
 
 ## Supported architectures
 
-`amd64`, `aarch64` and `armv7` images are built from Home Assistant base images and
+`amd64` and `aarch64` images are built from Home Assistant base images and
 published to GHCR for every release, so installs pull instead of build.
 
-- **armv7 is best-effort.** Home Assistant deprecated armv7 add-ons as of 2025.12, and
-  some agent CLIs and native modules do not ship 32-bit ARM builds. The daemon and web UI
-  start; unsupported optional agents are reported in the log and simply not offered. The
-  `ha` CLI is pinned to the last armv7 release (4.46.0) on that architecture.
-- `i386` is not supported.
+- `armv7` and `i386` (32-bit) are not supported. Home Assistant deprecated 32-bit systems in
+  2025 and dropped them from Core 2025.12 and Home Assistant OS 17. A Raspberry Pi 3 or 4
+  needs the 64-bit Home Assistant OS image (`aarch64`).
 
 ## Troubleshooting
 
@@ -428,4 +425,3 @@ the Paseo project.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
-[armv7-shield]: https://img.shields.io/badge/armv7-yes-green.svg
