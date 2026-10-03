@@ -77,7 +77,7 @@
 ## 8. CI
 
 - [ ] 8.1 Add `.github/workflows/lint.yaml` running `frenck/action-addon-linter` on `paseo/` and verify it passes on the branch and fails when a deliberate schema error is introduced
-- [ ] 8.2 Add `.github/workflows/builder.yaml` with a `home-assistant/builder` `--test` matrix for `aarch64`, `amd64` and `armv7`, and verify all three jobs run and report per-arch status
+- [x] 8.2 Add `.github/workflows/builder.yaml` with a `home-assistant/builder` `--test` matrix for `aarch64`, `amd64` and `armv7`, and verify all three jobs run and report per-arch status
 - [x] 8.3 Add an amd64 smoke-test job that runs the image with a fake `options.json`, then asserts `/api/health` via nginx with a stub `X-Ingress-Path`, rewritten `/_expo/` URLs plus the shim in `index.html`, and a successful WebSocket upgrade on `<prefix>/ws`. Verify the job passes in CI
 
 - [ ] 8.4 Add `.github/workflows/publish.yaml` (on tag `v*` + `workflow_dispatch`, `permissions: packages: write`, GHCR login with `GITHUB_TOKEN`, a per-arch `home-assistant/builder` matrix with amd64/aarch64 on native runners and armv7 via QEMU, pushing `ghcr.io/farajfarook/{arch}-addon-paseo:<version>` and `:latest`, plus a guard that fails if the tag differs from `config.yaml` `version`). Verify by running it via `workflow_dispatch` on a test tag and seeing the three packages under the repo's Packages

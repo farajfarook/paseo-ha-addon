@@ -56,5 +56,5 @@ schema:
   dictation: bool
   voice_mode: bool
   speech_provider: list(local|openai)
-  worktrees_root: str?
+  # worktrees_root removed on purpose (CI negative test)
   relay: bool?
