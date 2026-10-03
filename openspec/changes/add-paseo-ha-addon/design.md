@@ -299,3 +299,7 @@ The folder is seeded on first start, and files are never overwritten once they e
 ## Migration Plan
 
 - New add-on, so nothing to migrate. Rollout: tag the repo, users add the repository URL, install. Rollback: users restore the add-on from an HA backup or reinstall a previous tag. `/data` is forward-compatible because Paseo owns its own state migrations.
+
+## Update: armv7 dropped (0.10.3-3)
+
+`armv7` was removed after this design was written. Home Assistant deprecated 32-bit systems in May 2025 and dropped them from Core 2025.12 and Home Assistant OS 17. The armv7 image also built under QEMU, where `npm rebuild node-pty` hung and blocked the GitHub Release job of 0.10.3-2. The add-on now builds `amd64` and `aarch64` only, both on native runners. This supersedes the armv7 details above: the base image list in D1, the armv7 QEMU matrix entry and `DOCKER_DEFAULT_PLATFORM` note in the CI section, the `HA_CLI_ARMV7_VERSION=4.46.0` pin in D2, the armv7 best-effort wording in the agent and speech decisions, and the armv7 QEMU delay risk. The musl/Alpine concerns remain for `aarch64` and `amd64`.

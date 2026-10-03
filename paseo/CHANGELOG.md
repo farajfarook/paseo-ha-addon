@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.3-4
+
+- Stop downloading speech models that cannot be used. With `dictation` or `voice_mode` on and `speech_provider: local`, the Alpine image cannot load the local speech engine, but the daemon still downloaded about 790 MB of models. The add-on now turns both features off in that case, downloads nothing, and logs a warning that points to `speech_provider: openai`.
+
 ## 0.10.3-3
 
 - Drop the `armv7` (32-bit ARM) image. Home Assistant no longer supports 32-bit systems (Core 2025.12, Home Assistant OS 17), and the image took far too long to build under emulation. Raspberry Pi 3 and 4 users need the 64-bit Home Assistant OS image, which uses `aarch64`.

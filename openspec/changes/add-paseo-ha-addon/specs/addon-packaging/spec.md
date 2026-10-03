@@ -33,14 +33,14 @@ Each add-on release SHALL have publicly pullable pre-built images for every supp
 
 #### Scenario: Release publishes all architectures
 - **WHEN** a release tag matching the add-on version is pushed
-- **THEN** images for `aarch64`, `amd64` and `armv7` tagged with that version become publicly available
+- **THEN** images for `aarch64` and `amd64` tagged with that version become publicly available
 
 #### Scenario: Version mismatch blocked
 - **WHEN** a release tag does not match the add-on version in the manifest
 - **THEN** publishing fails and no images are pushed
 
 ### Requirement: Supported architectures
-The add-on SHALL declare and build for `aarch64`, `amd64` and `armv7`, each on the corresponding Home Assistant base image.
+The add-on SHALL declare and build for `aarch64` and `amd64`, each on the corresponding Home Assistant base image.
 
 #### Scenario: Install on a 64-bit ARM host
 - **WHEN** the add-on is installed on an `aarch64` host (e.g. Raspberry Pi 4/5, HA Green)
@@ -50,9 +50,9 @@ The add-on SHALL declare and build for `aarch64`, `amd64` and `armv7`, each on t
 - **WHEN** the add-on is installed on an `amd64` host
 - **THEN** an `amd64` image is used and the add-on starts
 
-#### Scenario: Install on a 32-bit ARM host
-- **WHEN** the add-on is installed on an `armv7` host
-- **THEN** an `armv7` image is used, the Paseo daemon and web UI start, and any agent CLI that cannot run on `armv7` is reported in the add-on log instead of failing the add-on
+#### Scenario: 32-bit ARM host not supported
+- **WHEN** the add-on is viewed on an `armv7` (32-bit ARM) host
+- **THEN** the add-on does not list `armv7` in its architectures, so the Supervisor does not offer it there, and the documentation states that 32-bit systems are unsupported and points Raspberry Pi 3/4 users to the 64-bit HAOS image
 
 ### Requirement: Pinned Paseo version
 Each add-on release SHALL install one explicit, pinned Paseo version, and the add-on version SHALL make that Paseo version identifiable.
@@ -92,4 +92,4 @@ The repository SHALL have CI that lints the add-on configuration and builds the 
 
 #### Scenario: Build per architecture
 - **WHEN** CI runs on a pull request
-- **THEN** an image build is attempted for `aarch64`, `amd64` and `armv7` and failures are reported per architecture
+- **THEN** an image build is attempted for `aarch64` and `amd64` and failures are reported per architecture
