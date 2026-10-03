@@ -194,13 +194,14 @@ pi list                          # what is installed
 pi install npm:<package>         # add a package (or git:github.com/<user>/<repo>)
 pi remove npm:<package>          # remove one, including a default
 pi config                        # switch single extensions/skills on or off
-pi update --extensions           # update installed packages
+pi install npm:<package>@<version>  # move a package to another version
+pi update --extensions           # update packages that are not pinned to a version
 ```
 
 - **Your changes persist.** Packages, their files and Pi's settings live in `/data`, so restarts, add-on updates and backup restores keep them.
 - **A removed default stays removed.** The add-on offers each default once and records it in `/data/paseo-ha/pi-packages.offered`. To get one back, run `pi install` for it. To reset to the defaults, delete that file and restart: every default you removed is installed again.
-- **New defaults arrive with updates.** When a release adds a default, it is installed once on the first start after the update. Version changes to an existing default are not applied; use `pi update --extensions`.
-- **Offline.** Defaults need network access to install. If one fails, the add-on logs a warning, still starts and tries again on the next start. With `PI_OFFLINE=1` set in `env_vars`, installs are skipped.
+- **New defaults arrive with updates.** When a release adds a default, it is installed once on the first start after the update. A release that only changes the version of a default does not touch your copy. Defaults are pinned to a version, and `pi update --extensions` never moves a pinned package. To upgrade one, install the version you want (`pi install npm:<package>@<version>` replaces the pinned entry), or install it without a version (`pi install npm:<package>`) so `pi update --extensions` keeps it current.
+- **Offline.** Defaults need network access to install. If one fails, the add-on logs a warning, still starts and tries again on the next start. All default installs share a 10-minute budget on each start, so a stalled registry cannot delay the add-on for long; defaults not reached are installed on the next start. With `PI_OFFLINE=1` set in `env_vars`, installs are skipped.
 - The start log has a `Pi packages: ...` line listing what is installed.
 
 ## Folders and storage

@@ -61,7 +61,8 @@ start_sup() { # start_sup <200|404>
 start_app() {
   docker rm -f "${APP}" >/dev/null 2>&1
   local extra=()
-  [[ -n "${AGENTS_DIR:-}" ]] && extra=(-v "$(hostpath "${AGENTS_DIR}"):/data/agents")
+  [[ -n "${PI_BUDGET:-}" ]] && extra+=(-e "PASEO_HA_PI_BUDGET=${PI_BUDGET}")   # test seam for the install time budget
+  [[ -n "${AGENTS_DIR:-}" ]] && extra+=(-v "$(hostpath "${AGENTS_DIR}"):/data/agents")
   docker run -d --name "${APP}" --network "${NET}" -e SUPERVISOR_TOKEN="${TOKEN}" \
     -v "$(hostpath "${WORK}/data"):/data" -v "$(hostpath "${WORK}/ha"):/homeassistant" \
     -v "$(hostpath "${WORK}/config"):/config" -v "$(hostpath "${WORK}/share"):/share" \
@@ -108,7 +109,7 @@ pack_fixture() { # pack_fixture <name> [version]  -> registry/<name>-<version>.t
   local name="$1" version="${2:-1.0.0}"
   docker run --rm -v "$(hostpath "${HERE}/fixtures"):/f:ro" -v "$(hostpath "${WORK}/registry"):/r" --entrypoint sh "${IMAGE}" -c     "rm -rf /tmp/p && cp -r /f/${name} /tmp/p && sed -i 's/\"version\": \"1.0.0\"/\"version\": \"${version}\"/' /tmp/p/package.json && cd /tmp/p && npm pack --pack-destination /r >/dev/null"
 }
-for n in a b c d f; do pack_fixture "paseo-test-${n}"; done
+for n in a b c d f g; do pack_fixture "paseo-test-${n}"; done
 pack_fixture paseo-test-a 1.1.0
 docker run -d --name "${REG}" --network "${NET}" --network-alias registry -e REGISTRY_DIR=/registry   -v "$(hostpath "${WORK}/registry"):/registry" -v "$(hostpath "${HERE}"):/t" --entrypoint node "${IMAGE}" /t/mock-registry.js >/dev/null
 
@@ -258,6 +259,18 @@ pack_fixture paseo-test-e
 restart_app
 check "retried and installed once available" has_pkg paseo-test-e
 check "...then recorded" in_ledger paseo-test-e
+
+# The shared time budget stops installs and defers the rest to the next start.
+set_defaults paseo-test-a@1.1.0 paseo-test-e@1.0.0 paseo-test-g@1.0.0
+docker rm -f "${APP}" >/dev/null 2>&1
+PI_BUDGET=0 start_app
+check "budget used up: warning names the deferral" test -n "$(last_start_log | grep 'time budget')"
+check "budget used up: daemon still healthy" in_app 'curl -fs http://127.0.0.1:6767/api/health'
+check "budget used up: deferred default not recorded" not_in_ledger paseo-test-g
+docker rm -f "${APP}" >/dev/null 2>&1
+PI_BUDGET= start_app
+check "next start installs the deferred default" has_pkg paseo-test-g
+check "...and records it" in_ledger paseo-test-g
 
 # --- 7. Secrets ----------------------------------------------------------------
 check "no secrets/credentials in /config" in_app '! grep -rq -e "'"${SECRET}"'" -e "'"${TOKEN}"'" /config && [ -z "$(find /config \( -name "*.json" -o -name "*auth*" -o -name "*key*" -o -name "*session*" \) -print)" ]'

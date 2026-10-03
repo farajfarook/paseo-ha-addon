@@ -12,13 +12,16 @@
 # - A default that is already configured (the user installed it) is recorded without
 #   running an install.
 # - A failed install is logged and NOT recorded, so the next start retries it.
+# - All installs share one time budget (PASEO_HA_PI_BUDGET, default 600 s) so a stalled
+#   registry cannot hold up the daemon; unfinished defaults are retried on the next start.
 # - Never aborts startup.
 # ==============================================================================
 
 DEFAULTS_FILE="${PASEO_HA_PI_DEFAULTS:-${PASEO_HA_OPT_DIR}/pi-packages.default}"   # override is a test seam
 LEDGER="${PASEO_HA_DATA}/paseo-ha/pi-packages.offered"
 PI_SETTINGS="${PI_CODING_AGENT_DIR:-${HOME}/.pi/agent}/settings.json"
-INSTALL_TIMEOUT="${PASEO_HA_PI_INSTALL_TIMEOUT:-300}"
+INSTALL_TIMEOUT="${PASEO_HA_PI_INSTALL_TIMEOUT:-300}"   # per install
+INSTALL_BUDGET="${PASEO_HA_PI_BUDGET:-600}"             # all installs together
 
 # ph_pi_identity SOURCE -> package identity, matching Pi's own (version/ref ignored).
 ph_pi_identity() {
@@ -70,7 +73,8 @@ ph_pi_log_installed() {
 }
 
 ph_pi_offer_defaults() {
-  local src id log
+  local src id log remaining
+  local deadline=$((SECONDS + INSTALL_BUDGET))
   local -A configured=()
   local -A offered=()
 
@@ -105,9 +109,16 @@ ph_pi_offer_defaults() {
       continue
     fi
 
+    remaining=$((deadline - SECONDS))
+    if (( remaining <= 0 )); then
+      ph_log_warn "Default Pi package install time budget (${INSTALL_BUDGET}s) used up; the remaining defaults, starting with ${src}, will be installed on the next start"
+      break
+    fi
+    (( remaining > INSTALL_TIMEOUT )) && remaining="${INSTALL_TIMEOUT}"
+
     ph_log_info "Installing default Pi package ${src}..."
     log="$(mktemp)"
-    if (cd "${HOME}" && PI_TELEMETRY=0 PI_SKIP_VERSION_CHECK=1 timeout "${INSTALL_TIMEOUT}" pi install "${src}") >"${log}" 2>&1; then
+    if (cd "${HOME}" && PI_TELEMETRY=0 PI_SKIP_VERSION_CHECK=1 timeout "${remaining}" pi install "${src}") >"${log}" 2>&1; then
       echo "${id}" >> "${LEDGER}"
       offered["${id}"]=1
       ph_log_info "Installed Pi package ${src}"
