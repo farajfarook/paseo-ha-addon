@@ -22,6 +22,7 @@ add-ons you enable in the configuration.
 - [Voice and dictation](#voice-and-dictation)
 - [Remote access: relay vs. direct port](#remote-access-relay-vs-direct-port)
 - [Logging in agents](#logging-in-agents)
+- [Pi packages](#pi-packages)
 - [Folders and storage](#folders-and-storage)
 - [Editable agent configuration](#editable-agent-configuration)
 - [What agents can do with Home Assistant](#what-agents-can-do-with-home-assistant)
@@ -174,6 +175,34 @@ Extra CLIs come from the `agents` option: they are installed with npm into `/dat
 and put first on `PATH`. Expect the first start after a change to take a while; a second
 start with the same selection does no network install.
 
+## Pi packages
+
+Pi is extended with [packages](https://pi.dev/packages) (extensions, skills, prompts, themes). The add-on installs these defaults the first time it starts:
+
+| Package | What it adds | Setup |
+|---|---|---|
+| `@juicesharp/rpiv-todo` | A todo list the agent keeps up to date. Paseo shows it as a panel. | None. |
+| `@juicesharp/rpiv-ask-user-question` | Structured multiple-choice questions instead of free-text guesses. Paseo shows them as dialogs. | None. |
+| `pi-subagents` | Hands tasks to sub-agents. Paseo shows their activity. | None. |
+| `pi-provider-litellm` | Use models through a LiteLLM proxy. | Run `/login litellm` in a Pi session, or add `LITELLM_BASE_URL` and `LITELLM_API_KEY` to `env_vars`. |
+| `pi-web-access` | Web search and page fetching. | Works without a key. Add provider keys to `env_vars` or `/data/home/.pi/agent/web-search.json`. YouTube and video features need `yt-dlp` and `ffmpeg`, which the image does not include. |
+
+Manage packages with Pi's own commands from a Paseo terminal. There is no add-on option and no file to edit:
+
+```sh
+pi list                          # what is installed
+pi install npm:<package>         # add a package (or git:github.com/<user>/<repo>)
+pi remove npm:<package>          # remove one, including a default
+pi config                        # switch single extensions/skills on or off
+pi update --extensions           # update installed packages
+```
+
+- **Your changes persist.** Packages, their files and Pi's settings live in `/data`, so restarts, add-on updates and backup restores keep them.
+- **A removed default stays removed.** The add-on offers each default once and records it in `/data/paseo-ha/pi-packages.offered`. To get one back, run `pi install` for it. To reset to the defaults, delete that file and restart: every default you removed is installed again.
+- **New defaults arrive with updates.** When a release adds a default, it is installed once on the first start after the update. Version changes to an existing default are not applied; use `pi update --extensions`.
+- **Offline.** Defaults need network access to install. If one fails, the add-on logs a warning, still starts and tries again on the next start. With `PI_OFFLINE=1` set in `env_vars`, installs are skipped.
+- The start log has a `Pi packages: ...` line listing what is installed.
+
 ## Folders and storage
 
 | Path in the container | Access | What it is |
@@ -185,7 +214,7 @@ start with the same selection does no network install.
 | `/ssl` | read-only | TLS certificates. Agents can inspect them, never change them. |
 | `/media` | read-only | The HA media library. |
 | `/backup` | read-only | HA backups. |
-| `/data` | private | Add-on state: Paseo home (`/data/home/.paseo`), all agent credentials and sessions, installed agents (`/data/agents`), skill-link manifest. Not shown by File Editor/Samba, but part of HA backups. |
+| `/data` | private | Add-on state: Paseo home (`/data/home/.paseo`), all agent credentials and sessions, installed agents (`/data/agents`), Pi packages (`/data/home/.pi/agent/npm`) and the record of which defaults were offered (`/data/paseo-ha/pi-packages.offered`), skill-link manifest. Not shown by File Editor/Samba, but part of HA backups. |
 
 ## Editable agent configuration
 

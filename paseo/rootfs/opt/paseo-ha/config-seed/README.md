@@ -17,9 +17,13 @@ add-on's private storage (`/data`), which is not visible here.
 | `claude/commands/` | Claude Code | Custom slash commands (`*.md`). |
 | `opencode/agents/` | OpenCode | Agent definitions (`*.md`). |
 | `opencode/plugins/` | OpenCode | Plugins (`*.js`/`*.ts`). |
-| `pi/extensions/` | Pi | Extensions. |
+| `pi/extensions/` | Pi | Single-file extensions. |
 | `pi/prompts/` | Pi | Prompt templates (`*.md`). |
 | `codex/prompts/` | Codex | Custom prompts (`*.md`). |
+
+## Pi packages
+
+Packages from <https://pi.dev/packages> are not managed with files here. Run `pi list`, `pi install npm:<package>` and `pi remove npm:<package>` in a Paseo terminal. Your changes persist across restarts and updates, and a default package you remove stays removed.
 
 ## Customising the bundled Home Assistant skill
 
