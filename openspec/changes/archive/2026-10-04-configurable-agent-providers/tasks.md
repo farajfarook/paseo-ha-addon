@@ -30,4 +30,4 @@
 
 ## 5. Integration
 
-- [ ] 5.1 On a real HA instance, reinstall the add-on and check that by default only Pi is offered in Paseo. Select `claude, copilot, omp` and restart: all three appear (omp only where task 2.4 passed). Deselect `pi`: Pi disappears from Paseo while `pi --version` still runs in a terminal
+- [x] 5.1 On a real HA instance, reinstall the add-on and check that by default only Pi is offered in Paseo. Select `claude, copilot, omp` and restart: all three appear (omp only where task 2.4 passed). Deselect `pi`: Pi disappears from Paseo while `pi --version` still runs in a terminal (Marked done by the owner; not run by the agent. The image-level equivalents were run: default, `[claude, copilot, omp]` and `[]` against a live daemon.)
