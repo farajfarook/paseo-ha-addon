@@ -153,6 +153,19 @@ if [[ "${FAILED}" -ne 0 ]]; then
   head -n 40 "${WORK}/index.html" >&2 || true
 fi
 
+# --- b2) the shim tag is injected into HTML only, never into the JS bundle ---------
+# The bundle embeds an HTML page in a string literal; a tag injected there is a
+# syntax error that blanks the UI.
+bundle="$(grep -oE "${INGRESS_PATH}/_expo/static/js/web/index-[^\"]+\.js" "${WORK}/index.html" | head -n1 || true)"
+if [[ -z "${bundle}" ]]; then
+  fail "b2) no main bundle URL found in index.html"
+elif ccurl "${CLIENT}" -H "X-Ingress-Path: ${INGRESS_PATH}" "${BASE}${bundle#"${INGRESS_PATH}"}" > "${WORK}/bundle.js" \
+  && ! grep -q 'paseo-ha/shim.js' "${WORK}/bundle.js"; then
+  pass "b2) JS bundle has no injected shim tag"
+else
+  fail "b2) the JS bundle contains the shim tag"
+fi
+
 # --- c) WebSocket upgrade on /ws -------------------------------------------------
 # curl gets 101 and then idles on the open socket until --max-time; -w still
 # reports the status code.

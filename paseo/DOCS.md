@@ -401,6 +401,7 @@ session.
   releases are gated by a smoke test that checks asset rewriting, the health endpoint and a
   WebSocket upgrade, but a new Paseo release can still need the rules updated. Bumps are
   documented in the repository README.
+- **Tested flows:** the sidebar UI was click-tested behind a mock Ingress (boot and auto-connect, deep-link reload, Settings, new workspace, terminal with live output, file explorer and opening a file, file download link). Anything not in that list is untested under Ingress; if a link or request escapes the Ingress path, the direct port still works.
 - **PWA installation from the panel is not a supported path.** The manifest's `start_url` is
   prefixed for ingress, but its `scope` stays `/`, so installing Paseo as a standalone app
   from inside Home Assistant is not expected to behave.
