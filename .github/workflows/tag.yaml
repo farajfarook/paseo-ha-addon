@@ -41,7 +41,7 @@ jobs:
       - name: Changelog entry must exist
         env:
           VERSION: ${{ steps.ver.outputs.version }}
-        run: .github/scripts/release-notes.sh "${VERSION}" > /dev/null
+        run: bash .github/scripts/release-notes.sh "${VERSION}" > /dev/null
 
       - name: Create tag and start Publish
         env:
