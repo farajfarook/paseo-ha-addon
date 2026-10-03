@@ -5,6 +5,14 @@
 # those tokens with the at-signs inside a comment: the substitution is global
 # and would inject multi-line config into the comment.
 
+# The shim tag is injected before </head> in HTML only. The same sub_filter also
+# runs on the JS bundle, which embeds an HTML page (mermaidRuntimeHtml) inside a
+# string literal; inserting a tag with quotes there is a syntax error.
+map $sent_http_content_type $paseo_shim_tag {
+    default "";
+    ~*^text/html "<script src=\"$http_x_ingress_path/paseo-ha/shim.js\"></script>";
+}
+
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -60,6 +68,8 @@ server {
         # every request. Without the header (direct loopback access) the empty
         # prefix keeps URLs working as-is.
         sub_filter '"/_expo/' '"$http_x_ingress_path/_expo/';
+        sub_filter '"/assets/' '"$http_x_ingress_path/assets/';
+        sub_filter '`/assets/' '`$http_x_ingress_path/assets/';
         sub_filter '"/manifest.json"' '"$http_x_ingress_path/manifest.json"';
         sub_filter '"/favicon.ico"' '"$http_x_ingress_path/favicon.ico"';
         sub_filter '"/apple-touch-icon.png"' '"$http_x_ingress_path/apple-touch-icon.png"';
@@ -70,6 +80,6 @@ server {
         # Run the ingress shim before the app bundle. The daemon injects its
         # connection hint directly before </head>, so the shim ends up after it
         # and can override the hint (see shim.js).
-        sub_filter '</head>' '<script src="$http_x_ingress_path/paseo-ha/shim.js"></script></head>';
+        sub_filter '</head>' '$paseo_shim_tag</head>';
     }
 }

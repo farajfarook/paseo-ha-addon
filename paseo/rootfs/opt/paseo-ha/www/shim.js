@@ -251,12 +251,57 @@
       window.__PASEO_HA_LISTENERS__ = true;
     }
 
-    // The router reads location during bundle evaluation (before any
-    // navigation), so strip once now; the address bar gets the prefix back in
-    // the same tick after the bundle has run, and stays prefixed afterwards
-    // (app history writes are re-prefixed by mapUrl).
+    // The router reads location while the (deferred) app bundle boots, which is
+    // after this script and after parsing. Strip the prefix now, and put it back
+    // only once the app has had time to boot: when the bundle has run and the
+    // router has made its first history write (mapUrl re-prefixes that one
+    // itself), or, failing that, shortly after the window load event.
     stripPath();
-    setTimeout(addPrefix, 0);
+    var restored = false;
+    function restore() {
+      if (restored) {
+        return;
+      }
+      restored = true;
+      addPrefix();
+    }
+    window.__PASEO_HA_RESTORE__ = restore;
+    nativeAdd("load", function () {
+      setTimeout(restore, 1500);
+    });
+
+    /* ------------------------------------------------------------------ */
+    /* 4b) Anchor clicks (file downloads)                                  */
+    /* ------------------------------------------------------------------ */
+    // Paseo builds download links from the daemon origin only
+    // (http://host/api/files/download?token=...) and triggers them with a
+    // programmatic <a download>.click(), which fetch/XHR patches never see.
+    // A capture-phase listener runs before the default action, so rewriting
+    // the href there is enough.
+    if (!window.__PASEO_HA_ANCHORS__) {
+      nativeAdd(
+        "click",
+        function (ev) {
+          try {
+            var el = ev.target;
+            while (el && el.nodeType === 1 && el.tagName !== "A") {
+              el = el.parentNode;
+            }
+            if (!el || el.tagName !== "A" || !el.getAttribute("href")) {
+              return;
+            }
+            var rewritten = rewrite(el.href);
+            if (rewritten) {
+              el.setAttribute("href", rewritten);
+            }
+          } catch (e) {
+            // leave the link alone
+          }
+        },
+        true
+      );
+      window.__PASEO_HA_ANCHORS__ = true;
+    }
 
     /* ------------------------------------------------------------------ */
     /* 5) window.open                                                      */
