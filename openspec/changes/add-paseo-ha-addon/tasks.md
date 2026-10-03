@@ -77,7 +77,7 @@
 ## 8. CI
 
 - [x] 8.1 Add `.github/workflows/lint.yaml` running `frenck/action-addon-linter` on `paseo/` and verify it passes on the branch and fails when a deliberate schema error is introduced
-- [x] 8.2 Add `.github/workflows/builder.yaml` with a `home-assistant/builder` `--test` matrix for `aarch64` and `amd64`, and verify both jobs run and report per-arch status (armv7 was dropped in 0.10.3-3)
+- [x] 8.2 Add `.github/workflows/builder.yaml` with `home-assistant/builder/actions/build-image@2026.09.0` test builds (no push) for `aarch64` and `amd64`, and verify both jobs build and pass their image-platform checks (armv7 was dropped in 0.10.3-3)
 - [x] 8.3 Add an amd64 smoke-test job that runs the image with a fake `options.json`, then asserts `/api/health` via nginx with a stub `X-Ingress-Path`, rewritten `/_expo/` URLs plus the shim in `index.html`, and a successful WebSocket upgrade on `<prefix>/ws`. Verify the job passes in CI
 
 - [x] 8.4 Add `.github/workflows/publish.yaml` (on tag `v*` + `workflow_dispatch`, `permissions: packages: write`, GHCR login with `GITHUB_TOKEN`, a per-arch `home-assistant/builder` matrix with amd64/aarch64 on native runners (armv7 via QEMU was dropped in 0.10.3-3), pushing `ghcr.io/farajfarook/{arch}-addon-paseo:<version>` and `:latest`, plus a guard that fails if the tag differs from `config.yaml` `version`). Verify by running it via `workflow_dispatch` on a test tag and seeing the packages under the repo's Packages
@@ -85,7 +85,7 @@
 
 ## 9. End-to-end validation on Home Assistant
 
-- [x] 9.0 Cut the first release `v0.10.3-1`, then set each of the two GHCR packages (`amd64`, `aarch64`) to Public. Verify with `docker logout ghcr.io && docker pull ghcr.io/farajfarook/amd64-addon-paseo:0.10.3-1` (and for aarch64 using `--platform`) that anonymous pulls succeed (anonymous `docker manifest inspect` verified for `0.10.3-1` and `0.10.3-3` on both arches; armv7 was dropped)
+- [x] 9.0 Cut the first release `v0.10.3-1`, then set each of the two GHCR packages (`amd64`, `aarch64`) to Public. Verify with `docker logout ghcr.io && docker pull ghcr.io/farajfarook/amd64-addon-paseo:0.10.3-1` (and for aarch64 using `--platform`) that anonymous pulls succeed (verified with no registry credentials: `docker pull ghcr.io/farajfarook/amd64-addon-paseo:0.10.3-1` and `docker pull --platform linux/arm64 ghcr.io/farajfarook/aarch64-addon-paseo:0.10.3-1` both downloaded the full image; `docker manifest inspect` also works for `0.10.3-3`; armv7 was dropped)
 - [ ] 9.1 Install the add-on from `https://github.com/farajfarook/paseo-ha-addon` (it should pull the pre-built image, not build locally) from the repository URL on a real HA OS instance (amd64 and, if available, aarch64), open "Paseo" from the sidebar over local HTTP and over HTTPS/Nabu Casa, confirm the "Home Assistant" project is preselected, ask Pi to make a small automation change end-to-end (edit → check → reload → verify), confirm live output, a deep-link reload, no mixed-content errors and no Paseo password prompt. Partially verified on `hass.faraj.au` (0.10.3-3): installed from the repo, the UI loads from the sidebar and from `/app/b498db88_paseo` over HTTPS, the "Home Assistant" project is present, no password prompt. Still open: local HTTP vs Nabu Casa, the Pi automation edit, deep-link reload, mixed-content check
 - [ ] 9.2 Take an HA backup including the add-on, uninstall, restore, and confirm Paseo projects and agent logins are back
 
