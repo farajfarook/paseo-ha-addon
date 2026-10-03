@@ -1,12 +1,11 @@
 name: Paseo
-version: "0.10.3-2"
+version: "0.10.3-3"
 slug: paseo
 description: Configure Home Assistant with coding agents (Pi, Claude Code, Codex, OpenCode) from the sidebar
 url: https://github.com/farajfarook/paseo-ha-addon
 arch:
   - aarch64
   - amd64
-  - armv7
 init: false
 image: ghcr.io/farajfarook/{arch}-addon-paseo
 ingress: true

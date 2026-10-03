@@ -25,25 +25,20 @@ RUN npm install -g --prefix /opt/node "@getpaseo/cli@${PASEO_VERSION}" \
  && node -e "require('node-pty')"
 
 # Static `ha` CLI from home-assistant/cli releases. The HA builder passes
-# BUILD_ARCH (aarch64|amd64|armv7); plain buildx provides TARGETARCH.
-# home-assistant/cli stopped publishing armv7 binaries after 4.46.0, so armv7
-# uses HA_CLI_ARMV7_VERSION.
+# BUILD_ARCH (aarch64|amd64); plain buildx provides TARGETARCH.
 ARG BUILD_ARCH
 ARG TARGETARCH
 ARG HA_CLI_VERSION=5.5.0
-ARG HA_CLI_ARMV7_VERSION=4.46.0
 RUN set -eu; \
     arch="${BUILD_ARCH:-}"; \
     if [ -z "$arch" ]; then \
       case "${TARGETARCH:-$(uname -m)}" in \
         amd64|x86_64) arch=amd64 ;; \
         arm64|aarch64) arch=aarch64 ;; \
-        arm|armv7l|armv7) arch=armv7 ;; \
         *) echo "unsupported architecture: ${TARGETARCH:-$(uname -m)}" >&2; exit 1 ;; \
       esac; \
     fi; \
     version="$HA_CLI_VERSION"; \
-    if [ "$arch" = armv7 ]; then version="$HA_CLI_ARMV7_VERSION"; fi; \
     curl -fsSL -o /usr/local/bin/ha \
       "https://github.com/home-assistant/cli/releases/download/${version}/ha_${arch}"; \
     chmod 755 /usr/local/bin/ha; \

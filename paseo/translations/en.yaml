@@ -28,7 +28,7 @@ configuration:
     description: Enable full voice conversations. With the local provider this downloads speech models (~0.6–1 GB) into persistent storage.
   speech_provider:
     name: Speech provider
-    description: "local: on-device models (may be unavailable on armv7/musl). openai: uses OpenAI, requires OPENAI_API_KEY in environment variables."
+    description: "local: on-device models (may be unavailable on musl). openai: uses OpenAI, requires OPENAI_API_KEY in environment variables."
   worktrees_root:
     name: Worktrees location
     description: Directory where Paseo creates git worktrees (e.g. /share/paseo-worktrees). Empty uses persistent add-on storage.

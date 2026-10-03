@@ -51,8 +51,8 @@ Home Assistant installs the pre-built image whose tag equals `version` in
    Publish.
 3. [Publish](.github/workflows/publish.yaml) checks that the tag (minus `v`) equals
    `paseo/config.yaml` `version`, then pushes
-   `ghcr.io/farajfarook/{amd64,aarch64,armv7}-addon-paseo:<version>` and `:latest`.
-   amd64 and aarch64 take minutes; armv7 builds under QEMU and is much slower.
+   `ghcr.io/farajfarook/{amd64,aarch64}-addon-paseo:<version>` and `:latest`.
+   Both take a few minutes.
 4. When every image exists, Publish creates the GitHub Release with the
    `CHANGELOG.md` section for that version as its notes
    (`.github/scripts/release-notes.sh`).
@@ -67,8 +67,8 @@ Check a tag locally before pushing it:
 ```
 
 **First release only:** GHCR creates new packages as private. After the first
-publish, open each of the three packages (`amd64-addon-paseo`,
-`aarch64-addon-paseo`, `armv7-addon-paseo`) under the repository's Packages, go
+publish, open each of the two packages (`amd64-addon-paseo` and
+`aarch64-addon-paseo`) under the repository's Packages, go
 to **Package settings → Change visibility** and set it to **Public**. The
 Supervisor pulls anonymously. Confirm with
 `docker logout ghcr.io && docker pull ghcr.io/farajfarook/amd64-addon-paseo:<version>`.

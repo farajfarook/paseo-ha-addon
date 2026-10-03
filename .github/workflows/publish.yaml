@@ -75,10 +75,6 @@ jobs:
           - arch: aarch64
             os: ubuntu-24.04-arm
             platform: linux/arm64
-          - arch: armv7
-            os: ubuntu-latest
-            platform: linux/arm/v7
-            qemu: true
     env:
       IMAGE: ghcr.io/farajfarook/${{ matrix.arch }}-addon-paseo
       VERSION: ${{ needs.guard.outputs.version }}
@@ -88,15 +84,6 @@ jobs:
         with:
           ref: ${{ needs.guard.outputs.ref }}
           persist-credentials: false
-
-      # Keep DOCKER_DEFAULT_PLATFORM off this step: pulling the multi-arch binfmt
-      # image with it set to linux/arm/v7 gives an image the amd64 runner cannot
-      # exec ("exec format error"). It is set on the build step instead.
-      - name: Set up QEMU
-        if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm
 
       - name: Read build settings from paseo/build.yaml
         id: info
@@ -119,7 +106,7 @@ jobs:
         id: build
         env:
           # build-image calls docker/build-push-action without `platforms`, so buildx
-          # builds for DOCKER_DEFAULT_PLATFORM (armv7 runs under QEMU).
+          # builds for DOCKER_DEFAULT_PLATFORM.
           DOCKER_DEFAULT_PLATFORM: ${{ matrix.platform }}
         uses: home-assistant/builder/actions/build-image@2026.09.0
         with:
