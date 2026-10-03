@@ -1,7 +1,7 @@
 # Paseo Home Assistant Add-on
 
 Run [Paseo](https://paseo.sh) — a self-hosted daemon and web UI for coding agents
-(Pi, Claude Code, Codex, OpenCode) — directly on your Home Assistant box, opened
+(Pi, Claude, Codex, Copilot, OpenCode, Oh My Pi) — directly on your Home Assistant box, opened
 from the HA sidebar and authenticated by Home Assistant. Agents start inside your
 Home Assistant configuration with live API access, bundled guidance and optional
 git snapshots, so configuring Home Assistant with agents is easy and safe.
@@ -27,7 +27,7 @@ See [`paseo/DOCS.md`](paseo/DOCS.md) for configuration and the security model.
 
 | Add-on | Description |
 |---|---|
-| [Paseo](paseo/) | Paseo daemon + web UI with Pi bundled and optional Claude Code / Codex / OpenCode |
+| [Paseo](paseo/) | Paseo daemon + web UI with Pi bundled and Claude / Codex / Copilot / OpenCode / Oh My Pi selectable in one `providers` option |
 
 ## License
 

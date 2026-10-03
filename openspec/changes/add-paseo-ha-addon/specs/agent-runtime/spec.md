@@ -22,6 +22,8 @@ The add-on SHALL start the Paseo daemon with the bundled web UI enabled when the
 - **THEN** daemon log output is visible there
 
 ### Requirement: Bundled Pi harness
+> **Superseded** by the `configurable-agent-providers` change (capability `agent-providers`): Pi is still built into the image, but it is now one of six selectable providers and can be turned off with the `providers` option.
+
 The add-on image SHALL include the Pi coding agent CLI so that Pi is available as a Paseo provider immediately after installation, with no extra install step.
 
 #### Scenario: Pi available out of the box
@@ -33,6 +35,8 @@ The add-on image SHALL include the Pi coding agent CLI so that Pi is available a
 - **THEN** Pi remains authenticated
 
 ### Requirement: Optional additional agent CLIs
+> **Superseded** by the `configurable-agent-providers` change (capability `agent-providers`): the `agents` option is replaced by `providers` (Claude, Codex, Copilot, OpenCode, Pi, Oh My Pi), and Paseo's provider enable flags now follow it.
+
 Users SHALL be able to select additional agent CLIs (at least Claude Code, Codex and OpenCode) through add-on options; selected agents SHALL be installed and available as Paseo providers.
 
 #### Scenario: Enable an extra agent
@@ -142,7 +146,7 @@ The add-on SHALL expose an optional relay setting. When it is set, it SHALL forc
 - **THEN** the daemon makes no relay connection, even if relay was previously enabled in Paseo
 
 ### Requirement: Settings owned by Paseo remain editable
-The add-on SHALL NOT lock Paseo settings that Paseo's own Settings screen can edit at runtime, such as MCP injection, browser tools, providers, profiles, plugins and system prompt. Changes made there SHALL persist across add-on restarts.
+The add-on SHALL NOT lock Paseo settings that Paseo's own Settings screen can edit at runtime, such as MCP injection, browser tools, profiles, plugins and system prompt. Changes made there SHALL persist across add-on restarts. Which providers are enabled is the exception: it is owned by the add-on's `providers` option and is reapplied on every start (see the `agent-providers` capability); other per-provider settings still persist.
 
 #### Scenario: Change a setting in Paseo UI
 - **WHEN** the user changes a runtime setting (e.g. auto-archive after merge) in Paseo's Settings screen and restarts the add-on

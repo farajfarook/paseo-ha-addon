@@ -10,8 +10,9 @@ add-on runs it on your Home Assistant machine and opens it from the HA sidebar, 
 agent can read and edit your Home Assistant configuration and check its work against the
 live API instead of guessing.
 
-Pi is bundled and works out of the box. Claude Code, Codex and OpenCode are optional
-add-ons you enable in the configuration.
+Pi is bundled and works out of the box. Claude, Codex, Copilot, OpenCode and Oh My Pi are
+optional: pick the providers you want in the `providers` option and the add-on installs
+their CLIs and enables them in Paseo.
 
 ## Table of contents
 
@@ -21,6 +22,7 @@ add-ons you enable in the configuration.
 - [Which settings live where](#which-settings-live-where)
 - [Voice and dictation](#voice-and-dictation)
 - [Remote access: relay vs. direct port](#remote-access-relay-vs-direct-port)
+- [Agent providers](#agent-providers)
 - [Logging in agents](#logging-in-agents)
 - [Pi packages](#pi-packages)
 - [Folders and storage](#folders-and-storage)
@@ -74,7 +76,7 @@ add-on start.
 |---|---|---|
 | `workspace` | string, `/homeassistant` | Directory new terminals and agent sessions start in. Created if missing. Set it to another mapped path (e.g. `/share/paseo`) to work somewhere else by default. |
 | `git_snapshot` | boolean, `false` | Keep `/homeassistant` under git for review and rollback. See [Git snapshots](#git-snapshots-and-rollback). |
-| `agents` | list of `claude-code`, `codex`, `opencode`, `[]` | Extra agent CLIs to install into `/data/agents` on start and expose as Paseo providers. Deselected agents are uninstalled. Installs are skipped when the selection did not change, and failures never stop the add-on. |
+| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. Pi is built into the image, so it needs no install and can be switched off by removing it. Installs are skipped when the selection did not change, and a failed install only disables that provider. See [Agent providers](#agent-providers). |
 | `env_vars` | list of `{name, value}`, `[]` | Environment variables exported to the daemon and therefore to every agent — e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`. **Only the names are logged, never the values.** |
 | `password` | string, empty | Password required for direct-port access. It is never asked for on the sidebar/ingress path. See [Relay vs. direct port](#remote-access-relay-vs-direct-port). |
 | `hostnames` | list of strings, `[]` | Extra DNS names the daemon accepts on the direct port (`PASEO_HOSTNAMES`), e.g. `paseo.example.com`, when you reach HA through a proxy or a custom name. |
@@ -100,13 +102,18 @@ every start.
 
 **Owned by Paseo's Settings screen** (never set by this add-on, so they stay editable and
 survive restarts): MCP injection into agents, browser tools, auto-archive after merge,
-terminal and agent profiles, agent providers, plugins, system prompt append, skills
+terminal and agent profiles, plugins, system prompt append, skills
 handling, git limits, and the voice LLM provider/model.
 
 Because environment variables lock a setting in Paseo (the UI reports it as an override),
 the add-on only uses them for options that are add-on-owned or start-up-only. If you set
 one of the Paseo-owned settings through `env_vars` yourself, Paseo will show it as
 overridden — that is expected.
+
+**Owned by the add-on:** which agent providers are enabled (`agents.providers.<id>.enabled`).
+It is set from the `providers` option on every start, so enabling or disabling a provider in
+Paseo's Settings only lasts until the next restart. Other per-provider settings you add in
+Paseo (labels, models, commands) are kept.
 
 **Advanced:** Paseo's own config file is `/data/home/.paseo/config.json`, merged under the
 environment variables above. Edit it from a Paseo terminal (stop the add-on first, or
@@ -157,13 +164,34 @@ daemon rejects the request with "Host not allowed". Without a password the port 
 closed even when mapped — the add-on logs a warning and the daemon remains loopback-only.
 The sidebar path never asks for the password: nginx authenticates to the daemon for you.
 
+## Agent providers
+
+The `providers` option lists the same six providers Paseo supports:
+
+| ID | Agent | Installed from |
+|---|---|---|
+| `pi` | Pi | built into the image (on by default) |
+| `claude` | Claude Code | npm `@anthropic-ai/claude-code` |
+| `codex` | Codex | npm `@openai/codex` |
+| `copilot` | GitHub Copilot CLI | npm `@github/copilot` (sign in with `copilot login` in a terminal, or set `COPILOT_GITHUB_TOKEN` in `env_vars`) |
+| `opencode` | OpenCode | npm `opencode-ai` |
+| `omp` | Oh My Pi | npm `@oh-my-pi/pi-coding-agent` plus the Bun runtime it needs (best effort, see [Known limitations](#known-limitations)) |
+
+On every start the add-on installs the selected providers, removes the deselected ones and
+sets each provider's enabled flag in Paseo. A provider is enabled only if it is selected
+**and** its CLI runs; if an install fails, the log shows why, Paseo starts with that
+provider disabled, and the next start retries. Deselecting a provider keeps its login and
+settings under `/data/home`, so selecting it again restores them. With an empty list Paseo
+starts with every provider disabled.
+
 ## Logging in agents
 
-Pi is installed in the image, so it is offered as a provider immediately. To authenticate:
+Pi is installed in the image, so it is offered as a provider immediately (until you remove
+it from `providers`). To authenticate:
 
 1. Open Paseo from the sidebar and start a terminal session.
-2. Run the agent's login flow, e.g. `pi` (then its auth command), `claude`, `codex login`
-   or `opencode auth login`.
+2. Run the agent's login flow, e.g. `pi` (then its auth command), `claude`, `codex login`,
+   `copilot login` or `opencode auth login`.
 3. Or skip interactive login entirely by putting the provider key in `env_vars` (for
    example `ANTHROPIC_API_KEY`).
 
@@ -171,7 +199,7 @@ Credentials are stored under `/data/home` (`~/.claude`, `~/.codex`, `~/.pi/agent
 `~/.config`, `~/.local/...`), which is persistent, private to the add-on, and included in
 HA backups. They are never written to the editable `/config` folder.
 
-Extra CLIs come from the `agents` option: they are installed with npm into `/data/agents`
+Extra CLIs come from the `providers` option: they are installed with npm into `/data/agents`
 and put first on `PATH`. Expect the first start after a change to take a while; a second
 start with the same selection does no network install.
 
@@ -407,7 +435,8 @@ Open the add-on **Log** tab. The daemon's own output is there too.
 | `Port 6767 is mapped but no password is set; the daemon stays loopback-only` | Set `password` to enable direct access, or unmap the port. |
 | `A password is set but port 6767 is not mapped...` | Harmless: the password only applies to the direct port. Ingress never asks for it. |
 | `Local speech engine (sherpa-onnx-node) cannot load on this platform` | Dictation and voice mode were turned off and nothing was downloaded. Use `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars`. |
-| `Agent <name> could not be installed or does not run on <arch>` | That optional agent is not offered. Pi and the other agents still work. |
+| `Provider <id> could not be installed or does not run on <arch>` | That provider is disabled in Paseo and retried on the next start. Pi and the other providers still work. |
+| `Unknown provider '<name>' in providers option` | The value is ignored. Use one of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`. |
 | `Skill '<name>' ... has the same name as a Paseo built-in skill; skipped` | Rename your skill folder so Paseo's own skill sync cannot conflict. |
 | `Moved existing <dir> to <dir>.paseo-ha-backup-...` | A real tool folder was in the way of a `/config` link. Move your files into `/config` and delete the backup. |
 | `SUPERVISOR_TOKEN is not set` | The container is not running under the Supervisor (e.g. a plain `docker run`). API access is unavailable. |
@@ -435,6 +464,10 @@ session.
 - **Paseo's Pair-device and share links do not point at the ingress URL**, so the mobile and
   desktop apps connect through the relay or the direct port rather than through the sidebar
   panel.
+- **Oh My Pi (`omp`) does not run on the Alpine (musl) images.** Its native add-on is
+  published for glibc only (the aarch64 package has no musl build either) and refuses to
+  load on musl, even with `gcompat` (checked on amd64). Selecting `omp`
+  is safe: the install is attempted, the failure is logged and Oh My Pi stays disabled.
 - **Claude Code refuses `--dangerously-skip-permissions` when run as root**, so its
   permission prompts stay on. Approve them interactively, or use Pi.
 - **No multi-user isolation.** Everyone using the panel shares one Paseo daemon, one set of
