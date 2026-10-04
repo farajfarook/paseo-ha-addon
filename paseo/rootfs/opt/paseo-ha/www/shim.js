@@ -377,21 +377,44 @@
         hosts = null;
       }
       if (Array.isArray(hosts)) {
-        var kept = hosts.filter(function (h) {
+        var changed = false;
+        var kept = [];
+        hosts.forEach(function (h) {
           var id = h && typeof h.serverId === "string" ? h.serverId : null;
-          if (!id || id === liveId || id.indexOf("local:") === 0) {
-            return true;
+          if (!id || id === liveId || id.indexOf("local:") === 0 || !Array.isArray(h.connections)) {
+            kept.push(h);
+            return;
           }
-          var conns = Array.isArray(h.connections) ? h.connections : [];
-          var ours = conns.some(function (c) {
-            return c && c.type === "directTcp" && typeof c.endpoint === "string" && c.endpoint.toLowerCase() === want;
+          var others = h.connections.filter(function (c) {
+            return !(c && c.type === "directTcp" && typeof c.endpoint === "string" && c.endpoint.toLowerCase() === want);
           });
-          if (ours) {
-            stale.push(id);
+          if (others.length === h.connections.length) {
+            kept.push(h); // not on this panel's endpoint
+            return;
           }
-          return !ours;
+          changed = true;
+          if (!others.length) {
+            stale.push(id); // only reachable here: drop the host and its state
+            return;
+          }
+          // Still reachable elsewhere (relay, another address): keep the host and
+          // its state, and drop only the connection that now answers as liveId.
+          var copy = {};
+          for (var key in h) {
+            if (Object.prototype.hasOwnProperty.call(h, key)) {
+              copy[key] = h[key];
+            }
+          }
+          copy.connections = others;
+          var ids = others.map(function (c) {
+            return c && c.id;
+          });
+          if (ids.indexOf(h.preferredConnectionId) === -1) {
+            copy.preferredConnectionId = ids[0] || null;
+          }
+          kept.push(copy);
         });
-        if (stale.length) {
+        if (changed) {
           localStorage.setItem(REGISTRY, JSON.stringify(kept));
         }
       }

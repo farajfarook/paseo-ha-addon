@@ -51,9 +51,11 @@ each selected CLI and enables it in Paseo. The first start needs internet access
 Updating works like any other add-on: **Update** in the Add-on Store. `/data` (Paseo
 state, agent logins, installed agents) survives updates and is included in HA backups.
 
-Uninstalling deletes `/data`, but the daemon's server ID comes back the same on a
-reinstall. It is derived from your Home Assistant instance and the add-on, so the panel
-and paired Paseo apps recognise the new install as the same host. If the browser still
+Uninstalling deletes `/data`, but the daemon's server ID normally comes back the same on
+a reinstall. It is derived from your Home Assistant instance ID (`/homeassistant/.storage/core.uuid`)
+and the add-on, so the panel and paired Paseo apps recognise the new install as the same
+host. If that file can't be read, the add-on uses a random ID, which survives restarts and
+updates but not a reinstall. If the browser still
 remembers an older ID (for example after restoring an older backup), the panel drops the
 old host entry by itself and connects to the running daemon. Sessions from before the
 uninstall are gone with `/data`.

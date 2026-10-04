@@ -12,7 +12,7 @@
 ## Goals / Non-Goals
 
 **Goals:**
-- A reinstall on the same HA keeps the daemon's ID, so clients never see a change.
+- A reinstall on the same HA keeps the daemon's ID when the HA instance UUID is readable, so clients don't see a change.
 - When the ID did change (installs from before this change, a restored older backup, a deleted `/data`, no UUID), the sidebar panel recovers by itself on the next open.
 
 **Non-Goals:**

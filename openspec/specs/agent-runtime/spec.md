@@ -146,14 +146,14 @@ The add-on SHALL let users supply environment variables (e.g. provider API keys)
 - **THEN** agents launched by Paseo see that variable and its value does not appear in the add-on log
 
 ### Requirement: Stable daemon identity
-The daemon SHALL keep the same server ID across restarts, add-on updates and reinstalls of the same add-on on the same Home Assistant instance, so Paseo clients that have seen the daemon keep recognising it. An existing server ID SHALL never be changed by the add-on.
+The daemon SHALL keep the same server ID across restarts and add-on updates. When the Home Assistant instance UUID is readable, it SHALL also get the same server ID back after a reinstall of the same add-on on the same instance. An existing server ID SHALL never be changed by the add-on.
 
 #### Scenario: Restart and update
 - **WHEN** the add-on is restarted or updated
 - **THEN** the daemon reports the same server ID as before
 
 #### Scenario: Reinstall
-- **WHEN** the add-on is uninstalled and installed again on the same Home Assistant instance, and its data was wiped
+- **WHEN** the add-on is uninstalled and installed again on the same Home Assistant instance, its data was wiped, and the instance UUID is readable on both installs
 - **THEN** the daemon reports the same server ID it reported after the earlier install, as long as that install also started with fresh data under this behaviour
 
 #### Scenario: Existing installation
@@ -162,4 +162,4 @@ The daemon SHALL keep the same server ID across restarts, add-on updates and rei
 
 #### Scenario: No Home Assistant instance ID
 - **WHEN** the Home Assistant instance UUID cannot be read on a fresh start
-- **THEN** the add-on still starts, and the daemon uses a new random server ID that it keeps from then on
+- **THEN** the add-on still starts, and the daemon uses a new random server ID that it keeps across restarts and updates, but not across a later reinstall

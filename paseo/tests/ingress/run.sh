@@ -215,12 +215,48 @@ function findExecutable() {
   results.push([!healed.reconnecting, "UI is not stuck on 'Reconnecting to host'"]);
 
   // Same ID: a reload changes nothing.
-  const before = await page.evaluate(() => localStorage.getItem("@paseo:daemon-registry"));
+  const snap = () => page.evaluate(() => {
+    const o = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k === "@paseo:daemon-registry" || k === "paseo:last-workspace-route-selection") o[k] = localStorage.getItem(k);
+    }
+    return o;
+  });
+  const before = await snap();
   await page.reload({ waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(4000);
-  const after = await page.evaluate(() => localStorage.getItem("@paseo:daemon-registry"));
-  const norm = (s) => JSON.stringify((JSON.parse(s || "[]")).map((h) => [h.serverId, h.connections.map((c) => c.endpoint)]));
-  results.push([norm(before) === norm(after), "matching server ID leaves the host list unchanged"]);
+  const after = await snap();
+  results.push([JSON.stringify(before) === JSON.stringify(after), "matching server ID leaves the stored hosts and last route unchanged"]);
+
+  // A stale host that is also reachable elsewhere keeps its record minus this endpoint.
+  const multi = {
+    serverId: "srv_multiMULTI01", label: "multi", appearance: { color: "none", badgeDisplay: null }, lifecycle: {},
+    connections: [
+      { id: `direct:${endpoint}`, type: "directTcp", endpoint, useTls: false },
+      { id: "relay:x", type: "relay", relayEndpoint: "relay.example:443", daemonPublicKeyB64: "AAAA" },
+    ],
+    preferredConnectionId: `direct:${endpoint}`, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+  await page.evaluate((m) => {
+    const reg = JSON.parse(localStorage.getItem("@paseo:daemon-registry") || "[]");
+    reg.push(m);
+    localStorage.setItem("@paseo:daemon-registry", JSON.stringify(reg));
+    localStorage.setItem(`@paseo/provider-snapshot/v2:["${m.serverId}","cwd",null]`, "{}");
+  }, multi);
+  // Inspect what the shim wrote before the app can touch it.
+  await page.route("**/_expo/static/js/web/*.js", (r) => r.abort());
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(500);
+  const m2 = await page.evaluate((id) => ({
+    host: (JSON.parse(localStorage.getItem("@paseo:daemon-registry") || "[]")).find((h) => h.serverId === id) || null,
+    key: localStorage.getItem(`@paseo/provider-snapshot/v2:["${id}","cwd",null]`),
+  }), multi.serverId);
+  await page.unroute("**/_expo/static/js/web/*.js");
+  results.push([
+    !!m2.host && m2.host.connections.length === 1 && m2.host.connections[0].id === "relay:x" && m2.host.preferredConnectionId === "relay:x" && m2.key === "{}",
+    `host also reachable elsewhere keeps its other connection and state (${JSON.stringify(m2.host && m2.host.connections.map((c) => c.id))})`,
+  ]);
 
   console.log("[browser] escapes:", escapes.length ? escapes.slice(0, 10) : "none");
   console.log("[browser] console errors:", errors.length ? errors.slice(0, 10) : "none");

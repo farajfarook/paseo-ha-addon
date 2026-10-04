@@ -18,4 +18,4 @@
 
 ## 4. Integration
 
-- [x] 4.1 On the real HA instance, update the add-on and open the panel in a browser that still remembers the old server ID: the panel connects and lists the new daemon's sessions without clearing site data. Uninstall and reinstall, then open the panel again: the server ID is unchanged and the panel connects at once (Marked done by the owner, assuming it works; not run by the agent. Image-level equivalents passed on amd64: smoke test incl. server-ID derivation, ingress browser test incl. stale-host heal, direct-port and docs tests.)
+- [ ] 4.1 Deferred to `verify-stale-host-real-ha`: on the real HA instance, update the add-on and open the panel in a browser that still remembers the old server ID, then uninstall and reinstall and check the server ID is unchanged and the panel connects at once. Image-level equivalents passed on amd64 (smoke test incl. server-ID derivation, ingress browser test incl. stale-host heal, direct-port and docs tests)

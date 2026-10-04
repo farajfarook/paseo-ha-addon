@@ -15,7 +15,9 @@
 # - Without a usable UUID, write a random ID of the same shape.
 # PASEO_SERVER_ID (env_vars) still overrides everything inside the daemon.
 # Test seams: PASEO_HA_HA_CONFIG_DIR, PASEO_HA_HOSTNAME.
+# Failures are logged and never block startup: the daemon then creates an ID itself.
 # ==============================================================================
+set -euo pipefail
 
 id_file="${PASEO_HOME:?PASEO_HOME is not set}/server-id"
 uuid_file="${PASEO_HA_HA_CONFIG_DIR:-/homeassistant}/.storage/core.uuid"
@@ -39,10 +41,10 @@ if [[ -n "${uuid}" && -n "${host_name}" ]]; then
   server_id="$(PH_SEED="paseo-ha:server-id:v1:${uuid,,}:${host_name}" node -e '
     const h = require("crypto").createHash("sha256").update(process.env.PH_SEED).digest("base64url");
     process.stdout.write("srv_" + h.slice(0, 12));
-  ')"
+  ' 2>/dev/null || true)"
   source_desc="derived from the Home Assistant instance"
 else
-  server_id="$(node -e 'process.stdout.write("srv_" + require("crypto").randomBytes(9).toString("base64url"))')"
+  server_id="$(node -e 'process.stdout.write("srv_" + require("crypto").randomBytes(9).toString("base64url"))' 2>/dev/null || true)"
   source_desc="random (Home Assistant instance UUID unavailable)"
 fi
 
@@ -51,9 +53,14 @@ if [[ ! "${server_id}" =~ ^srv_[A-Za-z0-9_-]{12}$ ]]; then
   exit 0
 fi
 
-mkdir -p "$(dirname "${id_file}")"
-tmp="$(mktemp "${id_file}.XXXXXX")"
-printf '%s\n' "${server_id}" > "${tmp}"
-chmod 600 "${tmp}"
-mv -f "${tmp}" "${id_file}"
-ph_log_info "Server ID ${server_id} created (${source_desc})"
+tmp=""
+if mkdir -p "$(dirname "${id_file}")" \
+  && tmp="$(mktemp "${id_file}.XXXXXX")" \
+  && printf '%s\n' "${server_id}" > "${tmp}" \
+  && chmod 600 "${tmp}" \
+  && mv -f "${tmp}" "${id_file}"; then
+  ph_log_info "Server ID ${server_id} created (${source_desc})"
+else
+  if [[ -n "${tmp}" ]]; then rm -f "${tmp}"; fi
+  ph_log_warn "Could not write ${id_file}; Paseo will create a random server ID itself"
+fi
