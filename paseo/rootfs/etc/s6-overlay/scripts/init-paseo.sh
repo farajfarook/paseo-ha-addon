@@ -151,5 +151,5 @@ for hook in "${PASEO_HA_HOOK_DIR}"/*.sh; do
   fi
 done
 
-ph_log_info "Paseo ${PASEO_HA_PASEO_VERSION:-?} / Pi ${PASEO_HA_PI_VERSION:-?}; workspace ${WORKSPACE}"
+ph_log_info "Paseo ${PASEO_HA_PASEO_VERSION:-?}; workspace ${WORKSPACE}"
 exit 0

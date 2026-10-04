@@ -1,24 +1,6 @@
-# agent-providers Specification
+# Spec Delta
 
-## Purpose
-Lets users pick the Paseo agent providers they want in one add-on option. The add-on then keeps the installed agent CLIs and Paseo's enabled providers in line with that choice.
-
-## Requirements
-
-### Requirement: Provider selection option
-The add-on SHALL expose one multi-select `providers` option on its Configuration tab. Its values are exactly Paseo's agent provider IDs: `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` (Oh My Pi). The default SHALL be `[pi]`.
-
-#### Scenario: Fresh install
-- **WHEN** the add-on is installed and started without changing its configuration
-- **THEN** the `providers` option holds only `pi`, and Pi is the only provider Paseo offers
-
-#### Scenario: Same list as Paseo
-- **WHEN** the user opens the add-on Configuration tab
-- **THEN** the `providers` option offers the same six providers Paseo supports and no others
-
-#### Scenario: Invalid value rejected
-- **WHEN** the user saves a `providers` value that is not one of the six IDs
-- **THEN** Home Assistant rejects the configuration before the add-on starts
+## MODIFIED Requirements
 
 ### Requirement: Installed CLIs follow the selection
 On each start, the add-on SHALL install the CLI of every selected provider, Pi included, into persistent storage and SHALL uninstall the CLI of every deselected provider it had installed. No provider CLI SHALL be part of the add-on image. If the selection is unchanged and every selected provider is already at the version it would install, nothing SHALL be downloaded again.
@@ -43,34 +25,7 @@ On each start, the add-on SHALL install the CLI of every selected provider, Pi i
 - **WHEN** the user selects `omp`
 - **THEN** the Oh My Pi CLI and the runtime it needs are installed, and both are removed when `omp` is deselected
 
-### Requirement: Paseo providers follow the selection
-On each start, before the daemon serves clients, the add-on SHALL turn on in Paseo every selected provider whose CLI is usable, and SHALL turn off every other supported provider. The add-on's selection SHALL override changes made in Paseo's settings.
-
-#### Scenario: Enabled providers match the selection
-- **WHEN** `providers` is `[pi, claude]` and both CLIs are usable
-- **THEN** Paseo offers Pi and Claude and marks Codex, Copilot, OpenCode and Oh My Pi as disabled
-
-#### Scenario: All providers deselected
-- **WHEN** `providers` is empty and the add-on starts
-- **THEN** Paseo starts and marks all six providers as disabled
-
-#### Scenario: Toggle in Paseo is overridden
-- **WHEN** the user enables a deselected provider in Paseo's settings and then restarts the add-on
-- **THEN** that provider is disabled again
-
-### Requirement: Failed installs never block startup
-If a selected provider's CLI cannot be installed or does not run on the host architecture, the add-on SHALL log the failure, SHALL turn that provider off in Paseo, SHALL keep starting, and SHALL retry the install on the next start.
-
-#### Scenario: Install fails
-- **WHEN** `omp` is selected but its install fails (no network or unsupported platform)
-- **THEN** the add-on log shows the failure, Paseo starts with Oh My Pi disabled, the other selected providers still work, and the next start tries the install again
-
-### Requirement: Credentials survive deselection
-Deselecting a provider SHALL NOT delete its login, credentials or configuration from persistent storage.
-
-#### Scenario: Re-select a provider
-- **WHEN** the user deselects `claude`, restarts, then selects it again and restarts
-- **THEN** Claude is reinstalled and is still logged in
+## ADDED Requirements
 
 ### Requirement: Latest stable versions
 On each start, the add-on SHALL look up the latest stable release of each selected provider's packages in the npm registry and SHALL install it when it differs from the installed version. A release marked as a prerelease SHALL NOT be installed. A maintainer-set hold for a provider SHALL take precedence over the lookup.
@@ -112,3 +67,9 @@ Setup steps that need the Pi CLI (installing default Pi packages and adding the 
 #### Scenario: Pi installed later
 - **WHEN** Pi is installed on a later start
 - **THEN** that start installs the default Pi packages
+
+## REMOVED Requirements
+
+### Requirement: Built-in Pi
+**Reason**: Pi is installed at runtime like every other provider so it can follow the latest stable release and be uninstalled when deselected.
+**Migration**: None needed. The first start after the update installs Pi into persistent storage when it is selected. Pi's logins, settings and packages are kept.

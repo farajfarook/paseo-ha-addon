@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.3-7
+
+- No agent CLI is built into the image any more. Pi is installed on start like Claude, Codex, Copilot, OpenCode and Oh My Pi, and deselecting it in `providers` now uninstalls it. It stays selected by default.
+- Every selected provider is installed at its latest stable npm release, checked on every start, instead of a version fixed by the add-on. Nothing is downloaded when no newer release is out.
+- Without access to the npm registry, installed providers keep their version. A new release whose CLI does not run is rolled back to the previous version and not tried again.
+- The first start after this update downloads Pi. Your Pi logins, settings and packages are kept. A fresh install now needs internet access on its first start.
+- The start log has a `Providers: ...` line with each provider's version. Bundled Paseo **0.10.3** is unchanged.
+
 ## 0.10.3-6
 
 - Install a set of default Pi packages on first start: `@juicesharp/rpiv-todo` and `@juicesharp/rpiv-ask-user-question` (the todo list and question dialogs Paseo shows for Pi), `pi-subagents`, `pi-provider-litellm` and `pi-web-access`.

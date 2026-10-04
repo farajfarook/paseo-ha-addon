@@ -27,7 +27,7 @@ See [`paseo/DOCS.md`](paseo/DOCS.md) for configuration and the security model.
 
 | Add-on | Description |
 |---|---|
-| [Paseo](paseo/) | Paseo daemon + web UI with Pi bundled and Claude / Codex / Copilot / OpenCode / Oh My Pi selectable in one `providers` option |
+| [Paseo](paseo/) | Paseo daemon + web UI with Pi (default), Claude, Codex, Copilot, OpenCode and Oh My Pi selectable in one `providers` option, each installed at its latest stable release on start |
 
 ## License
 
@@ -128,7 +128,7 @@ the sidebar panel. Check them **before** raising the pin.
    - Record the new Paseo version's facts in `openspec/changes/.../design.md` D3.
 
 4. **Re-pin and document**: `PASEO_VERSION` in `paseo/Dockerfile` and `paseo/build.yaml`
-   (both must match), `PI_VERSION`/`HA_CLI_VERSION` if they move with it, the add-on
+   (both must match), `HA_CLI_VERSION` if it moves with it, the add-on
    `version` in `paseo/config.yaml`, and a new `paseo/CHANGELOG.md` entry naming the Paseo
    version.
 

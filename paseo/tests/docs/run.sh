@@ -113,16 +113,15 @@ done
 # --- 4. changelog names the current version ----------------------------------
 VERSION="$(version_of)"
 BUILD_PIN="$(awk '/^ *PASEO_VERSION:/{print $2; exit}' "${ADDON_DIR}/build.yaml")"
-PI_PIN="$(awk '/^ *PI_VERSION:/{print $2; exit}' "${ADDON_DIR}/build.yaml")"
 if grep -qE "^## ${VERSION//./\\.}\$" "${CHANGELOG}"; then
   ok "CHANGELOG.md has an entry for version ${VERSION}"
 else
   bad "CHANGELOG.md has no '## ${VERSION}' entry"
 fi
-if grep -qF "**${BUILD_PIN}**" "${CHANGELOG}" && grep -qF "**${PI_PIN}**" "${CHANGELOG}"; then
-  ok "CHANGELOG.md names the bundled Paseo ${BUILD_PIN} and Pi ${PI_PIN}"
+if grep -qF "**${BUILD_PIN}**" "${CHANGELOG}"; then
+  ok "CHANGELOG.md names the bundled Paseo ${BUILD_PIN}"
 else
-  bad "the CHANGELOG entry for ${VERSION} must name the bundled Paseo (${BUILD_PIN}) and Pi (${PI_PIN}) versions"
+  bad "the CHANGELOG entry for ${VERSION} must name the bundled Paseo (${BUILD_PIN}) version"
 fi
 
 # --- 5. the pins agree between build.yaml, Dockerfile and config.yaml --------

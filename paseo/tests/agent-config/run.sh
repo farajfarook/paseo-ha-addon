@@ -113,10 +113,26 @@ for n in a b c d f g; do pack_fixture "paseo-test-${n}"; done
 pack_fixture paseo-test-a 1.1.0
 docker run -d --name "${REG}" --network "${NET}" --network-alias registry -e REGISTRY_DIR=/registry   -v "$(hostpath "${WORK}/registry"):/registry" -v "$(hostpath "${HERE}"):/t" --entrypoint node "${IMAGE}" /t/mock-registry.js >/dev/null
 
+# Pi is installed at runtime by 20-providers, but the app container uses the mock
+# registry. Seed /data/agents with Pi from the real registry first; the hook's own
+# lookup then fails against the mock and keeps the installed version.
+seed_pi() { # seed_pi <host agents dir>
+  docker run --rm -v "$(hostpath "$1"):/a" --entrypoint sh "${IMAGE}" -c '
+    set -e; [ -f /a/package.json ] || echo "{\"name\":\"paseo-ha-agents\",\"private\":true}" > /a/package.json
+    v="$(npm view @earendil-works/pi-coding-agent@latest version)"
+    npm install --prefix /a --no-audit --no-fund --omit=dev "@earendil-works/pi-coding-agent@${v}" >/dev/null
+    { grep -v "^pi=" /a/.paseo-ha-providers.stamp 2>/dev/null || true; printf "pi=@earendil-works/pi-coding-agent@%s" "${v}"; } > /tmp/stamp
+    mv /tmp/stamp /a/.paseo-ha-providers.stamp' || { echo "cannot seed Pi (needs network)"; exit 1; }
+}
+mkdir -p "${WORK}/data/agents"
+seed_pi "${AGENTS_DIR:-${WORK}/data/agents}"
+
 # --- 1. First start: seeding, links, instructions, MCP (200), bootstrap -------
 options false /homeassistant
 start_sup 200
 start_app
+check "Pi kept with the registry unreachable" test -n "$(last_start_log | grep 'Could not check for a newer pi')"
+check "Pi enabled" in_app 'jq -e ".agents.providers.pi.enabled == true" $PASEO_HOME/config.json'
 
 for f in AGENTS.md README.md skills claude/agents claude/commands opencode/agents opencode/plugins pi/extensions pi/prompts codex/prompts; do
   check "seeded /config/${f}" test -e "${WORK}/config/${f}"
@@ -271,6 +287,14 @@ docker rm -f "${APP}" >/dev/null 2>&1
 PI_BUDGET= start_app
 check "next start installs the deferred default" has_pkg paseo-test-g
 check "...and records it" in_ledger paseo-test-g
+
+# Without Pi on PATH the step is skipped and records nothing, not even a default the
+# user already installed (paseo-test-c), so it is offered once Pi is back.
+set_defaults paseo-test-c@1.0.0
+check "no Pi: default packages step skipped" in_app 'export PATH=/opt/node/bin:/usr/sbin:/usr/bin:/sbin:/bin; ! command -v pi >/dev/null && (source /usr/local/lib/paseo-ha/common.sh; source /etc/paseo-ha/init.d/36-pi-packages.sh) 2>&1 | grep -q "Pi is not installed; skipping"'
+check "no Pi: nothing recorded as offered" not_in_ledger paseo-test-c
+restart_app
+check "Pi back: the default is recorded" in_ledger paseo-test-c
 
 # --- 7. Secrets ----------------------------------------------------------------
 check "no secrets/credentials in /config" in_app '! grep -rq -e "'"${SECRET}"'" -e "'"${TOKEN}"'" /config && [ -z "$(find /config \( -name "*.json" -o -name "*auth*" -o -name "*key*" -o -name "*session*" \) -print)" ]'

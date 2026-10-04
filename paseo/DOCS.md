@@ -10,9 +10,9 @@ add-on runs it on your Home Assistant machine and opens it from the HA sidebar, 
 agent can read and edit your Home Assistant configuration and check its work against the
 live API instead of guessing.
 
-Pi is bundled and works out of the box. Claude, Codex, Copilot, OpenCode and Oh My Pi are
-optional: pick the providers you want in the `providers` option and the add-on installs
-their CLIs and enables them in Paseo.
+Pick the agents you want in the `providers` option (Pi, Claude, Codex, Copilot, OpenCode,
+Oh My Pi; Pi by default). On every start the add-on installs the latest stable release of
+each selected CLI and enables it in Paseo. The first start needs internet access.
 
 ## Table of contents
 
@@ -76,7 +76,7 @@ add-on start.
 |---|---|---|
 | `workspace` | string, `/homeassistant` | Directory new terminals and agent sessions start in. Created if missing. Set it to another mapped path (e.g. `/share/paseo`) to work somewhere else by default. |
 | `git_snapshot` | boolean, `false` | Keep `/homeassistant` under git for review and rollback. See [Git snapshots](#git-snapshots-and-rollback). |
-| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. Pi is built into the image, so it needs no install and can be switched off by removing it. Installs are skipped when the selection did not change, and a failed install only disables that provider. See [Agent providers](#agent-providers). |
+| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi). Selected providers have the latest stable release of their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. Pi is installed the same way as the others and is selected by default. Nothing is downloaded when the selection is unchanged and no newer release exists, and a failed install only disables that provider. See [Agent providers](#agent-providers). |
 | `env_vars` | list of `{name, value}`, `[]` | Environment variables exported to the daemon and therefore to every agent — e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`. **Only the names are logged, never the values.** |
 | `password` | string, empty | Password required for direct-port access. It is never asked for on the sidebar/ingress path. See [Relay vs. direct port](#remote-access-relay-vs-direct-port). |
 | `hostnames` | list of strings, `[]` | Extra DNS names the daemon accepts on the direct port (`PASEO_HOSTNAMES`), e.g. `paseo.example.com`, when you reach HA through a proxy or a custom name. |
@@ -170,7 +170,7 @@ The `providers` option lists the same six providers Paseo supports:
 
 | ID | Agent | Installed from |
 |---|---|---|
-| `pi` | Pi | built into the image (on by default) |
+| `pi` | Pi | npm `@earendil-works/pi-coding-agent` (on by default) |
 | `claude` | Claude Code | npm `@anthropic-ai/claude-code` |
 | `codex` | Codex | npm `@openai/codex` |
 | `copilot` | GitHub Copilot CLI | npm `@github/copilot` (sign in with `copilot login` in a terminal, or set `COPILOT_GITHUB_TOKEN` in `env_vars`) |
@@ -184,10 +184,28 @@ provider disabled, and the next start retries. Deselecting a provider keeps its 
 settings under `/data/home`, so selecting it again restores them. With an empty list Paseo
 starts with every provider disabled.
 
+### Which versions are installed
+
+No agent CLI is part of the add-on image, and the add-on does not pin their versions:
+
+- **Latest stable, on every start.** The add-on asks the npm registry for each selected
+  package's `latest` release and installs it when it differs from the installed one. A
+  prerelease on the `latest` tag is ignored. A restart therefore picks up new agent releases
+  without an add-on update.
+- **No registry, no change.** If the registry can't be reached, installed providers keep
+  their version and the log says the update check was skipped. A provider that was never
+  installed stays disabled until a start with network access.
+- **Broken upgrades roll back.** If a new release installs but its CLI does not run, the
+  previous version is put back and stays enabled. That exact release is recorded in
+  `/data/agents/.paseo-ha-providers.failed` and not tried again; the next newer release is.
+- **Maintainer hold.** If a new agent release breaks with the Paseo version this add-on
+  ships, an add-on update can hold that package at a known good version until it is fixed.
+- The start log has a `Providers: ...` line with each enabled provider's version.
+
 ## Logging in agents
 
-Pi is installed in the image, so it is offered as a provider immediately (until you remove
-it from `providers`). To authenticate:
+Pi is selected by default, so it is offered as a provider once the first start has
+installed it (until you remove it from `providers`). To authenticate:
 
 1. Open Paseo from the sidebar and start a terminal session.
 2. Run the agent's login flow, e.g. `pi` (then its auth command), `claude`, `codex login`,
@@ -199,9 +217,10 @@ Credentials are stored under `/data/home` (`~/.claude`, `~/.codex`, `~/.pi/agent
 `~/.config`, `~/.local/...`), which is persistent, private to the add-on, and included in
 HA backups. They are never written to the editable `/config` folder.
 
-Extra CLIs come from the `providers` option: they are installed with npm into `/data/agents`
-and put first on `PATH`. Expect the first start after a change to take a while; a second
-start with the same selection does no network install.
+All agent CLIs come from the `providers` option: they are installed with npm into
+`/data/agents` and put first on `PATH`. Expect the first start after a change to take a
+while. Later starts only make a quick version check per provider and download nothing
+unless a newer release is out.
 
 ## Pi packages
 
@@ -436,6 +455,9 @@ Open the add-on **Log** tab. The daemon's own output is there too.
 | `A password is set but port 6767 is not mapped...` | Harmless: the password only applies to the direct port. Ingress never asks for it. |
 | `Local speech engine (sherpa-onnx-node) cannot load on this platform` | Dictation and voice mode were turned off and nothing was downloaded. Use `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars`. |
 | `Provider <id> could not be installed or does not run on <arch>` | That provider is disabled in Paseo and retried on the next start. Pi and the other providers still work. |
+| `Provider <id> is not installed and the npm registry could not be reached` | The add-on has no network access to npm. That provider stays disabled until a start that can reach `registry.npmjs.org`. |
+| `Could not check for a newer <id>; keeping the installed version` | Harmless: the registry was unreachable, so the installed version is used. |
+| `Provider <id> <package>@<version> could not be installed or does not run on <arch>; rolling back` | A new release is broken here. The previous version was restored and that release is skipped from now on. |
 | `Unknown provider '<name>' in providers option` | The value is ignored. Use one of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`. |
 | `Skill '<name>' ... has the same name as a Paseo built-in skill; skipped` | Rename your skill folder so Paseo's own skill sync cannot conflict. |
 | `Moved existing <dir> to <dir>.paseo-ha-backup-...` | A real tool folder was in the way of a `/config` link. Move your files into `/config` and delete the backup. |
@@ -464,6 +486,13 @@ session.
 - **Paseo's Pair-device and share links do not point at the ingress URL**, so the mobile and
   desktop apps connect through the relay or the direct port rather than through the sidebar
   panel.
+- **The first start needs internet access.** No agent is in the image, so a fresh install
+  that can't reach the npm registry starts with every provider disabled (the log says so)
+  and installs them on a later start.
+- **New agent releases arrive on restart, untested.** Agents follow their latest stable
+  release, not a version tested with this add-on, so a release that installs and starts but
+  misbehaves with the bundled Paseo reaches you on your next restart. Report it; an add-on
+  update can hold that agent at the previous version.
 - **Oh My Pi (`omp`) does not run on the Alpine (musl) images.** Its native add-on is
   published for glibc only (the aarch64 package has no musl build either) and refuses to
   load on musl, even with `gcompat` (checked on amd64). Selecting `omp`

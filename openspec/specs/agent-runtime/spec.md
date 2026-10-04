@@ -20,19 +20,6 @@ The add-on SHALL start the Paseo daemon with the bundled web UI enabled when the
 - **WHEN** the user opens the add-on Log tab
 - **THEN** daemon log output is visible there
 
-### Requirement: Bundled Pi harness
-> **Superseded** by the `configurable-agent-providers` change (capability `agent-providers`): Pi is still built into the image, but it is now one of six selectable providers and can be turned off with the `providers` option.
-
-The add-on image SHALL include the Pi coding agent CLI so that Pi is available as a Paseo provider immediately after installation, with no extra install step.
-
-#### Scenario: Pi available out of the box
-- **WHEN** the user opens Paseo for the first time after installation
-- **THEN** Pi is listed as an available provider
-
-#### Scenario: Pi authentication persists
-- **WHEN** the user authenticates Pi (via environment variable option or its login flow) and later restarts or updates the add-on
-- **THEN** Pi remains authenticated
-
 ### Requirement: Optional additional agent CLIs
 > **Superseded** by the `configurable-agent-providers` change (capability `agent-providers`): the `agents` option is replaced by `providers` (Claude, Codex, Copilot, OpenCode, Pi, Oh My Pi), and Paseo's provider enable flags now follow it.
 
