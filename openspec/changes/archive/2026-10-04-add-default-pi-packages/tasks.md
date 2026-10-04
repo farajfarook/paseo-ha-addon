@@ -21,5 +21,5 @@
 
 ## 4. Integration
 
-- [ ] 4.0 On a real start with network access, verify that all five defaults install on both amd64 and aarch64 (Alpine/musl) and that Pi loads them without errors (`pi list`, plus a Pi session in Paseo that shows the todo panel and a structured question)
-- [ ] 4.1 Build the amd64 image and run `paseo/tests/smoke/run.sh` and `paseo/tests/agent-config/run.sh`. Then manually install the add-on on a test HA instance, update it to a locally built newer tag, and confirm in the Paseo terminal that `pi list` keeps the user's changes
+- [x] 4.0 On a real start with network access, verify that all five defaults install on both amd64 and aarch64 (Alpine/musl) and that Pi loads them without errors (`pi list`, plus a Pi session in Paseo that shows the todo panel and a structured question)
+- [x] 4.1 Build the amd64 image and run `paseo/tests/smoke/run.sh` and `paseo/tests/agent-config/run.sh`. Then manually install the add-on on a test HA instance, update it to a locally built newer tag, and confirm in the Paseo terminal that `pi list` keeps the user's changes
