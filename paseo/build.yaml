@@ -9,3 +9,4 @@ labels:
 args:
   PASEO_VERSION: 0.10.3
   HA_CLI_VERSION: 5.5.0
+  GH_CLI_VERSION: 2.102.0

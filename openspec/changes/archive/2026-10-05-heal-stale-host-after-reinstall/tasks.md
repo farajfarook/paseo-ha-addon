@@ -14,7 +14,7 @@
 ## 3. Documentation and release
 
 - [x] 3.1 Document in `paseo/DOCS.md`: the server ID survives reinstalls, the panel heals a stale host, desktop and mobile apps may need the host removed after a restore from an older backup, and two Paseo add-ons on one HA share the panel endpoint (Known limitations). Add the storage keys and `/h/` route to the "Bumping Paseo" checks in `README.md`, and add them, the server-ID rejection and the `server-id` file as anchors in `.github/scripts/paseo-anchors.sh` so the CI `--check` gate covers them. Verify `bash paseo/tests/docs/run.sh` passes
-- [x] 3.2 Bump `version` in `paseo/config.yaml` to `0.10.3-8` and add the CHANGELOG entry (Bundled Paseo **0.10.3** unchanged). Verify the docs check passes and `shellcheck paseo/rootfs/etc/paseo-ha/init.d/*.sh .github/scripts/*.sh` is clean
+- [x] 3.2 Bump `version` in `paseo/config.yaml` to `0.10.3-9` and add the CHANGELOG entry (Bundled Paseo **0.10.3** unchanged). Verify the docs check passes and `shellcheck paseo/rootfs/etc/paseo-ha/init.d/*.sh .github/scripts/*.sh` is clean
 
 ## 4. Integration
 

@@ -25,6 +25,7 @@ each selected CLI and enables it in Paseo. The first start needs internet access
 - [Agent providers](#agent-providers)
 - [Logging in agents](#logging-in-agents)
 - [Pi packages](#pi-packages)
+- [Git access](#git-access)
 - [Folders and storage](#folders-and-storage)
 - [Editable agent configuration](#editable-agent-configuration)
 - [What agents can do with Home Assistant](#what-agents-can-do-with-home-assistant)
@@ -229,6 +230,71 @@ All agent CLIs come from the `providers` option: they are installed with npm int
 while. Later starts only make a quick version check per provider and download nothing
 unless a newer release is out.
 
+## Git access
+
+Agents can clone, pull and push without prompts in any of these ways. You can combine
+them. The start log has one `Git access: ...` line listing the SSH keys in use and the
+GitHub CLI state. It never shows key contents or tokens.
+
+**GitHub CLI (recommended for GitHub).** `gh` is built into the image. Sign in once from a
+Paseo terminal:
+
+```sh
+gh auth login        # GitHub.com → HTTPS → "Login with a web browser"; enter the code at github.com/login/device
+gh auth status
+```
+
+The login is stored in `/data/home/.config/gh`, so it survives restarts, updates and is
+included in backups. On every start git is set to use `gh` for `https://github.com` and
+`https://gist.github.com`, unless you have set your own credential helper for them.
+Agents can then push over HTTPS and use `gh pr create`, `gh issue list`, `gh run view` and
+so on.
+
+**Token in `env_vars`.** Add `GH_TOKEN` (or `GITHUB_TOKEN`) to `env_vars` to skip the
+interactive login. `gh` and git over HTTPS use it. Prefer a
+[fine-grained personal access token](https://github.com/settings/personal-access-tokens)
+limited to the repositories agents need.
+
+**SSH keys you already have.** Private keys in `/homeassistant/.ssh` and `/share/.ssh` are
+picked up on every start and offered by `ssh` (and so `git`). They are used where they
+are, never copied:
+
+- A key readable by other users (common when it was copied in over Samba) is changed to
+  mode `600`, and the log says so, because `ssh` refuses such keys.
+- A key with a passphrase is skipped with a warning: agents cannot type passphrases.
+- `known_hosts` files in those folders are trusted.
+- Keys in `/homeassistant/.ssh` are never committed by `git_snapshot` (see
+  [Git snapshots](#git-snapshots-and-rollback)).
+- With more than five keys, servers may reject you before the right one is tried. Pin
+  a key per host in `/data/home/.ssh/config`:
+
+  ```
+  Host gitea.local
+    IdentityFile /share/.ssh/gitea_deploy
+  ```
+
+**A new key just for Paseo.** In a Paseo terminal run
+`ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519` and add `~/.ssh/id_ed25519.pub` to
+your git host (as a deploy key for one repository, ideally). `~/.ssh` is
+`/data/home/.ssh`, so the key persists and is included in backups.
+
+**Host keys.** The keys of github.com, gitlab.com and bitbucket.org are built in. Any
+other host is accepted on first connection and remembered in `/data/home/.ssh/known_hosts`.
+A host whose key changes is refused (remove the old entry with `ssh-keygen -R <host>` if the
+change is expected). `ssh` runs in batch mode, so it fails instead of asking for a password.
+To get interactive prompts in your own terminal sessions, add `BatchMode no` under `Host *`
+in `/data/home/.ssh/config`, which is read before the add-on's settings and wins.
+
+**Commit identity.** Set it once (stored in `/data/home/.gitconfig`):
+
+```sh
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+
+All of these credentials are available to **every agent session**. See the
+[security section](#security-and-trust-model).
+
 ## Pi packages
 
 Pi is extended with [packages](https://pi.dev/packages) (extensions, skills, prompts, themes). The add-on installs these defaults the first time it starts:
@@ -269,7 +335,7 @@ pi update --extensions           # update packages that are not pinned to a vers
 | `/ssl` | read-only | TLS certificates. Agents can inspect them, never change them. |
 | `/media` | read-only | The HA media library. |
 | `/backup` | read-only | HA backups. |
-| `/data` | private | Add-on state: Paseo home (`/data/home/.paseo`), all agent credentials and sessions, installed agents (`/data/agents`), Pi packages (`/data/home/.pi/agent/npm`) and the record of which defaults were offered (`/data/paseo-ha/pi-packages.offered`), skill-link manifest. Not shown by File Editor/Samba, but part of HA backups. |
+| `/data` | private | Add-on state: Paseo home (`/data/home/.paseo`), all agent credentials and sessions, installed agents (`/data/agents`), GitHub CLI login (`/data/home/.config/gh`), SSH keys and known hosts made in the add-on (`/data/home/.ssh`), Pi packages (`/data/home/.pi/agent/npm`) and the record of which defaults were offered (`/data/paseo-ha/pi-packages.offered`), skill-link manifest. Not shown by File Editor/Samba, but part of HA backups. |
 
 ## Editable agent configuration
 
@@ -383,10 +449,24 @@ enabled, so agent changes are reviewable and revertible:
   and an initial commit.
 - A `.gitignore` is written **only if none exists** and keeps `secrets.yaml`,
   `.storage/`, databases, logs, `.cloud/`, `deps/`, `tts/`, `__pycache__/`,
-  `home-assistant.log*`, `.HA_VERSION` and `.ha_run.lock` out of git.
-- **An existing repository is never modified.** If you already keep your config in git, the
+  `home-assistant.log*`, `.HA_VERSION` and `.ha_run.lock` out of git. It also excludes
+  SSH keys: `.ssh/`, `id_rsa`, `id_ecdsa`, `id_ed25519` (and the `_sk` variants), `*.pem`
+  and `*.key`. Public keys (`*.pub`) can still be committed.
+- A `.gitignore` written by an earlier version of the add-on (it starts with the line
+  `# Written by the Paseo add-on (git_snapshot)...`) gets the SSH rules appended once.
+  Nothing else in it changes.
+- **A repository you created is never modified.** If you already keep your config in git, the
   add-on only marks it as a `safe.directory` so root can operate on it, and leaves your
   history, ignores and remotes alone.
+- **Tracked SSH keys are reported, not fixed.** On every start, if `.ssh/` or a private key
+  file is tracked in `/homeassistant` (whoever created the repository), the log shows a
+  warning naming the files. Untrack them yourself, then rotate the keys if the repository
+  was ever pushed, because git history still contains them:
+
+  ```sh
+  git -C /homeassistant rm -r --cached .ssh
+  git -C /homeassistant commit -m "Stop tracking SSH keys"
+  ```
 - Turning the option off does not delete `.git`.
 - The bundled guidance tells agents to commit before and after each change with a
   descriptive message, so you can review `git -C /homeassistant log` in a Paseo terminal.
@@ -435,6 +515,11 @@ makes them dangerous.
 - **Values in `env_vars` are secrets in `/data`**, exported into every agent's environment.
   They are never logged, but any agent (and anything it prints from the environment) can
   read them.
+- **Git credentials are shared by every agent.** A GitHub CLI login, a `GH_TOKEN` and any
+  SSH key the add-on finds (including those in `/homeassistant/.ssh` and `/share/.ssh`) can
+  be used by any agent session to read and push to every repository they reach. A full
+  `gh auth login` reaches all of your repositories. Prefer a fine-grained token or a
+  per-repository deploy key.
 - **Prompt injection is the real risk.** Agents read files that external systems can
   influence (logs, webhooks, device payloads). The mitigations are narrow: read-only
   `/ssl`, `/media`, `/backup`; the ask-before-restart and ask-before-touching-other-addons

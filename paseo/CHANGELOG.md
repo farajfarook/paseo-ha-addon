@@ -1,10 +1,23 @@
 # Changelog
 
-## 0.10.3-8
+## 0.10.3-9
 
 - Fix the sidebar panel staying on **Reconnecting to host** and showing old sessions after the add-on is uninstalled and installed again. The daemon's server ID now survives a reinstall: on a fresh install it is derived from your Home Assistant instance and the add-on, so the same add-on gets the same ID back. An existing ID is never changed.
 - If the browser remembers the panel's host under an older ID (installs before this release, or a restore from an older backup), the panel removes that stale entry when it opens and connects to the running daemon. Hosts on other addresses are left alone. No need to clear site data.
 - Bundled Paseo **0.10.3** is unchanged. Agents still follow their latest stable release.
+
+## 0.10.3-8
+
+- Agents can now use git remotes without prompts. See the new **Git access** section in the documentation.
+- The GitHub CLI (`gh` 2.102.0) is built in. Sign in once with `gh auth login` in a Paseo terminal, or add `GH_TOKEN` to `env_vars`. On every start git uses `gh` for `https://github.com` unless you set your own credential helper.
+- SSH keys in `/homeassistant/.ssh` and `/share/.ssh` are used automatically, in place. Keys readable by others are changed to mode `600` (logged), and keys with a passphrase are skipped with a warning.
+- `~/.ssh` is now persistent (`/data/home/.ssh`), so keys you create with `ssh-keygen` survive updates.
+- github.com, gitlab.com and bitbucket.org host keys are built in. Other hosts are accepted on first use and remembered. A changed host key is refused.
+- The start log has a `Git access: ...` line with the keys in use and the GitHub CLI state.
+- `git_snapshot` no longer commits SSH keys. The `.gitignore` it writes now also excludes `.ssh/`, `id_rsa`, `id_ecdsa`, `id_ed25519` (and `_sk` variants), `*.pem` and `*.key`. Public keys can still be committed.
+- A `.gitignore` written by an earlier version of the add-on gets these rules appended once on the next start. A `.gitignore` you wrote yourself is never changed.
+- If SSH keys are already tracked in `/homeassistant`, the start log warns and explains how to untrack them. History is never rewritten, so rotate any key that was pushed.
+- Rollback to an older version: run `git config --global --unset-all credential.https://github.com.helper` and the same for `https://gist.github.com` in a Paseo terminal, because the helper points at `gh`, which older images do not have. Bundled Paseo **0.10.3** is unchanged.
 
 ## 0.10.3-7
 
