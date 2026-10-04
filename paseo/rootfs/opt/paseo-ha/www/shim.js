@@ -21,6 +21,13 @@
  *      boots and around popstate listeners, and re-prefix pushState/replaceState
  *      URLs so the address bar keeps the ingress prefix (deep-link reloads work).
  *   5. window.open - same-origin /api, /public and /_expo URLs get the prefix.
+ *   6. Stale host heal - after a reinstall (or restore) the daemon can have a
+ *      new server ID. The app then refuses it ("Connection resolved to X,
+ *      expected Y") and stays on "Reconnecting to host". nginx renders the live
+ *      ID into this script's data-paseo-server-id; before the app boots we
+ *      drop hosts on this panel's endpoint that carry another ID, plus the
+ *      routes and keys that name them. The app re-adds the daemon from the
+ *      connection hint and prunes the stale cached rows itself.
  *
  * The prefix is discovered from the browser URL itself (HA's ingress path
  * shape), so this file is static; no per-request rendering is needed.
@@ -50,6 +57,11 @@
       useTls: useTls,
       label: "Home Assistant",
     };
+
+    /* ------------------------------------------------------------------ */
+    /* 6) Stale host heal (runs before the app reads storage or the path) */
+    /* ------------------------------------------------------------------ */
+    healStaleHost(prefix, host);
 
     /* ------------------------------------------------------------------ */
     /* URL rewriting helper                                                */
@@ -338,6 +350,102 @@
       window.console && console.error("[paseo-ha] ingress shim error:", err);
     } catch (e) {
       /* ignore */
+    }
+  }
+
+  // Paseo internals this depends on (recheck on a Paseo bump, see README):
+  //   localStorage "@paseo:daemon-registry" = [{serverId, connections:[{type,endpoint}]}]
+  //   localStorage "paseo:last-workspace-route-selection" = {serverId, workspaceId}
+  //   routes under /h/<serverId>/...
+  function healStaleHost(prefix, endpoint) {
+    try {
+      var script = document.currentScript;
+      var liveId = script && script.getAttribute("data-paseo-server-id");
+      if (!liveId || !window.localStorage) {
+        return; // unknown live ID: never guess
+      }
+      var REGISTRY = "@paseo:daemon-registry";
+      var LAST_ROUTE = "paseo:last-workspace-route-selection";
+      var want = endpoint.toLowerCase();
+      var stale = [];
+
+      var raw = localStorage.getItem(REGISTRY);
+      var hosts = null;
+      try {
+        hosts = raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        hosts = null;
+      }
+      if (Array.isArray(hosts)) {
+        var kept = hosts.filter(function (h) {
+          var id = h && typeof h.serverId === "string" ? h.serverId : null;
+          if (!id || id === liveId || id.indexOf("local:") === 0) {
+            return true;
+          }
+          var conns = Array.isArray(h.connections) ? h.connections : [];
+          var ours = conns.some(function (c) {
+            return c && c.type === "directTcp" && typeof c.endpoint === "string" && c.endpoint.toLowerCase() === want;
+          });
+          if (ours) {
+            stale.push(id);
+          }
+          return !ours;
+        });
+        if (stale.length) {
+          localStorage.setItem(REGISTRY, JSON.stringify(kept));
+        }
+      }
+      if (!stale.length) {
+        return;
+      }
+      function isStale(id) {
+        return stale.indexOf(id) !== -1;
+      }
+
+      try {
+        var last = JSON.parse(localStorage.getItem(LAST_ROUTE) || "null");
+        if (last && isStale(last.serverId)) {
+          localStorage.removeItem(LAST_ROUTE);
+        }
+      } catch (e) {
+        // leave it
+      }
+
+      var doomed = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k === REGISTRY || (k.indexOf("@paseo") !== 0 && k.indexOf("paseo") !== 0)) {
+          continue;
+        }
+        for (var j = 0; j < stale.length; j++) {
+          if (k.indexOf(stale[j]) !== -1) {
+            doomed.push(k);
+            break;
+          }
+        }
+      }
+      doomed.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+
+      // A deep link into a removed host would open a dead page: start at the root.
+      var p = window.location.pathname;
+      var rest = p === prefix || p.indexOf(prefix + "/") === 0 ? p.slice(prefix.length) : p;
+      var m = rest.match(/^\/h\/([^/]+)(?:\/|$)/);
+      if (m && isStale(decodeURIComponent(m[1]))) {
+        window.history.replaceState(null, "", prefix + "/");
+      }
+
+      console.info(
+        "[paseo-ha] removed " + stale.length + " stale host entr" + (stale.length === 1 ? "y" : "ies") +
+          " for " + endpoint + " (daemon is now " + liveId + ")"
+      );
+    } catch (e) {
+      try {
+        console.warn("[paseo-ha] stale host heal skipped:", e);
+      } catch (e2) {
+        /* ignore */
+      }
     }
   }
 })();

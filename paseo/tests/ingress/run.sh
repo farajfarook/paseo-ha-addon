@@ -9,6 +9,9 @@
 #   3. in-app navigation keeps URLs under the prefix
 #   4. a deep-link reload of a nested page returns to the same page
 #   5. reports any request that escapes the prefix
+#   6. a stale host (another server ID on the panel endpoint) is healed: the
+#      registry holds the live ID and unrelated hosts, stale keys/routes are
+#      gone, and the UI connects; a matching ID leaves storage untouched
 #
 # Usage: run.sh <image> [port]
 # Env:   INGRESS_KEEP=1   keep containers for debugging
@@ -176,6 +179,48 @@ function findExecutable() {
   } else {
     console.log("[browser] WARN: no nav elements found; navigation/reload checks skipped");
   }
+
+  // 6) Stale host heal (heal-stale-host-after-reinstall).
+  const STALE = "srv_staleSTALE01";
+  const live = await page.evaluate(async (p) => (await (await fetch(`${p}/api/status`)).json()).serverId, PREFIX);
+  const endpoint = `localhost:${PORT}`;
+  const other = {
+    serverId: "srv_otherOTHER01", label: "other", appearance: { color: "none", badgeDisplay: null }, lifecycle: {},
+    connections: [{ id: "direct:elsewhere:6767", type: "directTcp", endpoint: "elsewhere:6767", useTls: false }],
+    preferredConnectionId: "direct:elsewhere:6767", createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+  await page.evaluate(({ STALE, endpoint, other }) => {
+    const stale = {
+      serverId: STALE, label: "old", appearance: { color: "none", badgeDisplay: null }, lifecycle: {},
+      connections: [{ id: `direct:${endpoint}`, type: "directTcp", endpoint, useTls: false }],
+      preferredConnectionId: `direct:${endpoint}`, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    localStorage.setItem("@paseo:daemon-registry", JSON.stringify([stale, other]));
+    localStorage.setItem("paseo:last-workspace-route-selection", JSON.stringify({ serverId: STALE, workspaceId: "wks_x" }));
+    localStorage.setItem(`@paseo/provider-snapshot/v2:["${STALE}","cwd",null]`, "{}");
+  }, { STALE, endpoint, other });
+  await page.goto(`${BASE}${PREFIX}/h/${STALE}/workspace/wks_x`, { waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(8000);
+  const healed = await page.evaluate((STALE) => ({
+    ids: (JSON.parse(localStorage.getItem("@paseo:daemon-registry") || "[]")).map((h) => h.serverId),
+    last: localStorage.getItem("paseo:last-workspace-route-selection"),
+    staleKeys: Object.keys(localStorage).filter((k) => k.includes(STALE)),
+    path: location.pathname,
+    reconnecting: /Reconnecting to host/i.test(document.body.innerText || ""),
+  }), STALE);
+  results.push([!!live && healed.ids.includes(live) && !healed.ids.includes(STALE), `stale host replaced by live ${live} (${JSON.stringify(healed.ids)})`]);
+  results.push([healed.ids.includes(other.serverId), "host on another endpoint kept"]);
+  results.push([!(healed.last || "").includes(STALE) && healed.staleKeys.length === 0, `stale keys removed (${JSON.stringify(healed.staleKeys)})`]);
+  results.push([healed.path.startsWith(PREFIX) && !healed.path.includes(STALE), `deep link into the stale host redirected (${healed.path})`]);
+  results.push([!healed.reconnecting, "UI is not stuck on 'Reconnecting to host'"]);
+
+  // Same ID: a reload changes nothing.
+  const before = await page.evaluate(() => localStorage.getItem("@paseo:daemon-registry"));
+  await page.reload({ waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
+  await page.waitForTimeout(4000);
+  const after = await page.evaluate(() => localStorage.getItem("@paseo:daemon-registry"));
+  const norm = (s) => JSON.stringify((JSON.parse(s || "[]")).map((h) => [h.serverId, h.connections.map((c) => c.endpoint)]));
+  results.push([norm(before) === norm(after), "matching server ID leaves the host list unchanged"]);
 
   console.log("[browser] escapes:", escapes.length ? escapes.slice(0, 10) : "none");
   console.log("[browser] console errors:", errors.length ? errors.slice(0, 10) : "none");

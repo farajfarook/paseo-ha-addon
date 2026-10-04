@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.3-8
+
+- Fix the sidebar panel staying on **Reconnecting to host** and showing old sessions after the add-on is uninstalled and installed again. The daemon's server ID now survives a reinstall: on a fresh install it is derived from your Home Assistant instance and the add-on, so the same add-on gets the same ID back. An existing ID is never changed.
+- If the browser remembers the panel's host under an older ID (installs before this release, or a restore from an older backup), the panel removes that stale entry when it opens and connects to the running daemon. Hosts on other addresses are left alone. No need to clear site data.
+- Bundled Paseo **0.10.3** is unchanged. Agents still follow their latest stable release.
+
 ## 0.10.3-7
 
 - No agent CLI is built into the image any more. Pi is installed on start like Claude, Codex, Copilot, OpenCode and Oh My Pi, and deselecting it in `providers` now uninstalls it. It stays selected by default.

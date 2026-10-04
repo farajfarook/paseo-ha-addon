@@ -13,6 +13,10 @@
 #   c) WebSocket upgrade on /ws with X-Ingress-Path    -> 101 (HA strips the
 #      ingress prefix before forwarding, so the add-on sees /ws)
 #   d) the same request from a different IP            -> 403
+#   e) the daemon's server ID equals $PASEO_HOME/server-id and is rendered into
+#      the shim tag; the 10-server-id hook derives the same ID for the same
+#      HA UUID + hostname, another for another UUID, a random one without a
+#      UUID, and never changes an existing file
 #
 # Usage: run.sh <image>
 # Env:   SMOKE_PREFIX   name prefix for containers/network (default paseo-smoke)
@@ -142,7 +146,7 @@ ccurl "${CLIENT}" -H "X-Ingress-Path: ${INGRESS_PATH}" -H "Accept: text/html" "$
 if grep -qF "${INGRESS_PATH}/_expo/" "${WORK}/index.html"; then
   pass "b) index.html references ${INGRESS_PATH}/_expo/"
 else fail "b) index.html has no ${INGRESS_PATH}/_expo/ reference"; fi
-if grep -qF "<script src=\"${INGRESS_PATH}/paseo-ha/shim.js\"" "${WORK}/index.html"; then
+if grep -qF "<script src=\"${INGRESS_PATH}/paseo-ha/shim.js\" data-paseo-server-id=\"" "${WORK}/index.html"; then
   pass "b) index.html injects the shim <script>"
 else fail "b) index.html lacks <script src=\"${INGRESS_PATH}/paseo-ha/shim.js\""; fi
 if grep -qF '"/_expo/' "${WORK}/index.html"; then
@@ -182,6 +186,48 @@ code="$(ccurl "${OTHER}" -o /dev/null -w '%{http_code}' -H "X-Ingress-Path: ${IN
   "${BASE}/api/health" || true)"
 if [[ "${code}" == "403" ]]; then pass "d) request from ${OTHER_IP} -> 403"
 else fail "d) request from ${OTHER_IP} -> ${code:-no response} (want 403)"; fi
+
+# --- e) stable server ID ----------------------------------------------------------
+live_id="$(ccurl "${CLIENT}" -H "X-Ingress-Path: ${INGRESS_PATH}" "${BASE}/api/status" | grep -oE '"serverId":"[^"]+"' | cut -d'"' -f4 || true)"
+file_id="$(docker exec "${ADDON}" bash -c 'source /run/paseo-ha/daemon.env; head -n1 "${PASEO_HOME}/server-id"' 2>/dev/null | tr -d '[:space:]' || true)"
+if [[ -n "${live_id}" && "${live_id}" == "${file_id}" ]]; then
+  pass "e) daemon server ID ${live_id} comes from \$PASEO_HOME/server-id"
+else fail "e) daemon server ID '${live_id}' != server-id file '${file_id}'"; fi
+if [[ -n "${live_id}" ]] && grep -qF "data-paseo-server-id=\"${live_id}\"" "${WORK}/index.html"; then
+  pass "e) shim tag carries the live server ID"
+else fail "e) shim tag lacks data-paseo-server-id=\"${live_id}\""; fi
+
+# Run the hook against scratch dirs: same UUID+host -> same ID, other UUID ->
+# other ID, no UUID -> random srv_ ID, existing file -> unchanged.
+# shellcheck disable=SC2016  # expanded inside the container
+hook_out="$(docker exec "${ADDON}" bash -c '
+  set -u
+  run() { # run <home> <ha-config-dir>
+    PASEO_HOME="$1" PASEO_HA_HA_CONFIG_DIR="$2" PASEO_HA_HOSTNAME=abcd1234-paseo \
+      bash -c "source /usr/local/lib/paseo-ha/common.sh; source /etc/paseo-ha/init.d/10-server-id.sh" >/dev/null 2>&1
+    head -n1 "$1/server-id" 2>/dev/null | tr -d "[:space:]"
+  }
+  t=$(mktemp -d)
+  mkdir -p $t/ha1/.storage $t/ha2/.storage $t/ha0 $t/h1 $t/h2 $t/h3 $t/h4 $t/h5
+  echo "{\"data\":{\"uuid\":\"0123456789abcdef0123456789abcdef\"}}" > $t/ha1/.storage/core.uuid
+  echo "{\"data\":{\"uuid\":\"fedcba9876543210fedcba9876543210\"}}" > $t/ha2/.storage/core.uuid
+  a=$(run $t/h1 $t/ha1); b=$(run $t/h2 $t/ha1); c=$(run $t/h3 $t/ha2); d=$(run $t/h4 $t/ha0)
+  echo srv_existing_1 > $t/h5/server-id; e=$(run $t/h5 $t/ha1)
+  echo "$a $b $c $d $e $(stat -c %a $t/h1/server-id)"
+  rm -rf $t
+' 2>&1 || true)"
+read -r id_a id_b id_c id_d id_e id_mode <<<"${hook_out}"
+re='^srv_[A-Za-z0-9_-]{12}$'
+if [[ "${id_a:-}" =~ ${re} && "${id_a}" == "${id_b:-}" ]]; then pass "e) hook derives the same ID for the same HA UUID and hostname (${id_a})"
+else fail "e) hook IDs differ or are malformed for one UUID: '${id_a:-}' '${id_b:-}' (${hook_out})"; fi
+if [[ "${id_c:-}" =~ ${re} && "${id_c}" != "${id_a:-}" ]]; then pass "e) another HA UUID gives another ID"
+else fail "e) another UUID gave '${id_c:-}'"; fi
+if [[ "${id_d:-}" =~ ${re} ]]; then pass "e) no HA UUID gives a random srv_ ID"
+else fail "e) no UUID gave '${id_d:-}'"; fi
+if [[ "${id_e:-}" == "srv_existing_1" ]]; then pass "e) an existing server-id file is kept"
+else fail "e) existing server-id became '${id_e:-}'"; fi
+if [[ "${id_mode:-}" == "600" ]]; then pass "e) server-id is written with mode 600"
+else fail "e) server-id mode is '${id_mode:-}'"; fi
 
 if [[ "${FAILED}" -ne 0 ]]; then
   log "Smoke test FAILED"

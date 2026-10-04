@@ -7,6 +7,9 @@
 // Env:   PASEO_HA_NGINX_PASSWORD  set when the direct port is enabled with a
 //                                 password (PASEO_PASSWORD is exported); empty
 //                                 means the daemon upstream needs no auth.
+//        PASEO_HA_SERVER_ID       the daemon's server ID, rendered into the shim
+//                                 tag; anything outside [A-Za-z0-9_:-]{1,128}
+//                                 renders as empty (the shim then skips its heal).
 "use strict";
 
 const fs = require("fs");
@@ -52,7 +55,11 @@ if (password) {
   wsHeader = "        proxy_set_header Sec-WebSocket-Protocol $paseo_ws_protocols;";
 }
 
+const rawServerId = String(process.env.PASEO_HA_SERVER_ID || "").trim();
+const serverId = /^[A-Za-z0-9_:-]{1,128}$/.test(rawServerId) ? rawServerId : "";
+
 const conf = tpl
+  .replace(/@SERVER_ID@/g, serverId)
   .replace(/@UPSTREAM_AUTH_HTTP@/g, authHttp)
   .replace(/@WS_PROTOCOLS_MAP@/g, wsMap)
   .replace(/@WS_PROTOCOLS_HEADER@/g, wsHeader);

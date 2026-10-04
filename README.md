@@ -84,8 +84,10 @@ Rules:
 
 The add-on does not fork Paseo. Its ingress adapter rewrites what the upstream web UI
 emits, so it depends on Paseo internals: root-absolute asset paths, the hard-coded `/ws`
-WebSocket path, the `window.__PASEO_INITIAL_DAEMON_CONNECTION__` hint and the
-`paseo.bearer.<token>` subprotocol. A version bump that moves one of those silently breaks
+WebSocket path, the `window.__PASEO_INITIAL_DAEMON_CONNECTION__` hint, the
+`paseo.bearer.<token>` subprotocol, and, for the stale-host heal, the `@paseo:daemon-registry`
+and `paseo:last-workspace-route-selection` storage keys, the `/h/<serverId>/` routes and the
+`$PASEO_HOME/server-id` file. A version bump that moves one of those silently breaks
 the sidebar panel. Check them **before** raising the pin.
 
 1. **Check the anchors of the candidate release** against the pinned one:
