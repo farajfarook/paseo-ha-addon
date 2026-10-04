@@ -51,6 +51,15 @@ each selected CLI and enables it in Paseo. The first start needs internet access
 Updating works like any other add-on: **Update** in the Add-on Store. `/data` (Paseo
 state, agent logins, installed agents) survives updates and is included in HA backups.
 
+Uninstalling deletes `/data`, but the daemon's server ID normally comes back the same on
+a reinstall. It is derived from your Home Assistant instance ID (`/homeassistant/.storage/core.uuid`)
+and the add-on, so the panel and paired Paseo apps recognise the new install as the same
+host. If that file can't be read, the add-on uses a random ID, which survives restarts and
+updates but not a reinstall. If the browser still
+remembers an older ID (for example after restoring an older backup), the panel drops the
+old host entry by itself and connects to the running daemon. Sessions from before the
+uninstall are gone with `/data`.
+
 ## Using Paseo from the sidebar
 
 Press **Paseo** in the side menu. The UI is served through Home Assistant Ingress, so it
@@ -548,6 +557,11 @@ Open the add-on **Log** tab. The daemon's own output is there too.
 | `Moved existing <dir> to <dir>.paseo-ha-backup-...` | A real tool folder was in the way of a `/config` link. Move your files into `/config` and delete the backup. |
 | `SUPERVISOR_TOKEN is not set` | The container is not running under the Supervisor (e.g. a plain `docker run`). API access is unavailable. |
 
+If the panel stays on **Reconnecting to host** after a reinstall or restore, reload the
+browser tab once. The panel replaces a host it remembers under an older server ID when it
+loads. The Paseo desktop and mobile apps don't do this. If their server ID changed, remove
+the host there and add or pair it again.
+
 If the panel opens to a blank page: check the Log tab for a failed `init-paseo` or nginx
 render, then restart the add-on. If the daemon is healthy but the panel stays blank, reload
 the browser tab; if it still fails, restart Home Assistant Core, which owns the ingress
@@ -571,6 +585,9 @@ session.
 - **Paseo's Pair-device and share links do not point at the ingress URL**, so the mobile and
   desktop apps connect through the relay or the direct port rather than through the sidebar
   panel.
+- **Two Paseo add-ons on one Home Assistant share the panel's host entry.** Both panels
+  connect through the same HA address. Each one replaces the other's entry when it opens,
+  so switching between them reconnects from scratch each time.
 - **The first start needs internet access.** No agent is in the image, so a fresh install
   that can't reach the npm registry starts with every provider disabled (the log says so)
   and installs them on a later start.

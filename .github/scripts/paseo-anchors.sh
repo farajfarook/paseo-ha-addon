@@ -64,6 +64,12 @@ report() { # report <server-package-dir> <protocol-package-dir>
   count 'protocol: buildDaemonWebSocketUrl'              'buildDaemonWebSocketUrl'   "${endpoints}"
   count 'protocol: hard-coded "/ws" path'                '"/ws'                      "${endpoints}"
   count 'bundle: paseo.bearer.<token> subprotocol'       'paseo\.bearer\.'           "${bundle}"
+  # Stale-host heal in shim.js (change heal-stale-host-after-reinstall).
+  count 'bundle: "@paseo:daemon-registry" key'           '"@paseo:daemon-registry"'  "${bundle}"
+  count 'bundle: "paseo:last-workspace-route-selection"' '"paseo:last-workspace-route-selection"' "${bundle}"
+  count 'bundle: /h/<serverId> host routes'               '`/h/\$\{'                  "${bundle}"
+  count 'bundle: rejects a changed serverId'             'Connection resolved to'    "${bundle}"
+  count 'server: $PASEO_HOME/server-id file'              '"server-id"'               "${s}/dist/server/server/server-id.js"
 
   echo
   echo "# exact root-absolute strings the nginx sub_filter rules prefix"

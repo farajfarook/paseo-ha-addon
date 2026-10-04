@@ -20,11 +20,22 @@ fi
 
 mkdir -p /etc/nginx/http.d /run/nginx
 
+# The daemon's server ID goes into the shim tag so the panel can drop a stale
+# host the browser remembers under an older ID (heal-stale-host-after-reinstall,
+# design D3). PASEO_SERVER_ID wins inside the daemon, so it wins here too.
+SERVER_ID="${PASEO_SERVER_ID:-}"
+if [[ -z "${SERVER_ID}" && -r "${PASEO_HOME:-}/server-id" ]]; then
+  SERVER_ID="$(head -n 1 "${PASEO_HOME}/server-id" | tr -d '[:space:]')"
+fi
+if [[ -z "${SERVER_ID}" ]]; then
+  ph_log_warn "Server ID unknown; the panel cannot heal a stale host after a reinstall"
+fi
+
 if [[ -n "${PASEO_PASSWORD:-}" ]]; then
   ph_log_info "Direct-port password configured; nginx authenticates to the daemon upstream"
-  PASEO_HA_NGINX_PASSWORD="${PASEO_PASSWORD}" node "${PASEO_HA_OPT_DIR}/nginx/render.js" "${TPL}" "${CONF}"
+  PASEO_HA_SERVER_ID="${SERVER_ID}" PASEO_HA_NGINX_PASSWORD="${PASEO_PASSWORD}" node "${PASEO_HA_OPT_DIR}/nginx/render.js" "${TPL}" "${CONF}"
 else
-  PASEO_HA_NGINX_PASSWORD="" node "${PASEO_HA_OPT_DIR}/nginx/render.js" "${TPL}" "${CONF}"
+  PASEO_HA_SERVER_ID="${SERVER_ID}" PASEO_HA_NGINX_PASSWORD="" node "${PASEO_HA_OPT_DIR}/nginx/render.js" "${TPL}" "${CONF}"
 fi
 
 if nginx -t >/dev/null 2>&1; then

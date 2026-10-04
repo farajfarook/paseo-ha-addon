@@ -1,7 +1,8 @@
 # Ingress adapter template (design D3). Rendered by /etc/paseo-ha/init.d/50-nginx.sh
-# into /etc/nginx/http.d/paseo.conf by nginx/render.js, which substitutes three
+# into /etc/nginx/http.d/paseo.conf by nginx/render.js, which substitutes four
 # tokens written below as UPSTREAM_AUTH_HTTP, WS_PROTOCOLS_MAP and
-# WS_PROTOCOLS_HEADER between at-signs (direct-port password only). Never write
+# WS_PROTOCOLS_HEADER (direct-port password only) and SERVER_ID (the daemon's
+# server ID, read by the shim to heal a stale host) between at-signs. Never write
 # those tokens with the at-signs inside a comment: the substitution is global
 # and would inject multi-line config into the comment.
 
@@ -10,7 +11,7 @@
 # string literal; inserting a tag with quotes there is a syntax error.
 map $sent_http_content_type $paseo_shim_tag {
     default "";
-    ~*^text/html "<script src=\"$http_x_ingress_path/paseo-ha/shim.js\"></script>";
+    ~*^text/html "<script src=\"$http_x_ingress_path/paseo-ha/shim.js\" data-paseo-server-id=\"@SERVER_ID@\"></script>";
 }
 
 map $http_upgrade $connection_upgrade {
