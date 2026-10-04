@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit configuration. Reference: https://docs.coderabbit.ai/reference/configuration
+#
+# The rules live in AGENTS.md (single source of truth for agents and reviewers).
+# The pre-merge checks below enforce AGENTS.md Rules 1-3; keep the two in sync.
+language: en-AU
+early_access: false
+
+reviews:
+  profile: assertive
+  # Approve the PR once all CodeRabbit comments are resolved, the latest commit has
+  # been reviewed and no pre-merge check is failing; request changes otherwise.
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  commit_status: true
+  fail_commit_status: true
+  collapse_walkthrough: false
+  poem: false
+  in_progress_fortune: false
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+
+  path_filters:
+    - "!tmp/**"
+
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Review against the repository rules in AGENTS.md (OpenSpec workflow,
+        version bump policy, conventions). Flag any deviation and cite the rule.
+    - path: "openspec/**"
+      instructions: |
+        OpenSpec artefacts (AGENTS.md Rules 1 and 2). Check that proposal.md,
+        design.md (when present) and tasks.md agree with each other and with the
+        code changed in this PR. Spec deltas must use ## ADDED/MODIFIED/REMOVED
+        Requirements, each requirement with at least one #### Scenario.
+    - path: "paseo/**"
+      instructions: |
+        Home Assistant add-on code. Apply AGENTS.md Rule 1 (OpenSpec coverage) and
+        Rule 3 (version bump for shipped files), plus its shell, options and pin
+        conventions.
+
+  pre_merge_checks:
+    custom_checks:
+      - name: "OpenSpec implementation coverage"
+        mode: error
+        instructions: |
+          Enforce AGENTS.md "Rule 1: every code change goes through OpenSpec".
+          Read AGENTS.md in the PR head and apply it exactly, using its list of
+          exempt files.
+
+          1. Collect the changed files and drop the exempt ones. If no code files
+             are left, PASS.
+          2. FAIL if the PR adds or modifies no OpenSpec change directory
+             (openspec/changes/<name>/ or openspec/changes/archive/YYYY-MM-DD-<name>/)
+             that contains proposal.md and tasks.md.
+          3. FAIL, listing the files, if any changed code file is not covered by a
+             task in tasks.md or by the proposal/design scope.
+          4. FAIL, listing the tasks, if any task is unticked (- [ ]), unless its
+             text says it is deferred to another named OpenSpec change.
+          5. FAIL if behaviour changes but the change has no spec deltas under
+             specs/<capability>/spec.md.
+          Otherwise PASS.
+
+      - name: "OpenSpec change archived"
+        mode: error
+        instructions: |
+          Enforce AGENTS.md "Rule 2: the change is archived in the same PR".
+          Read AGENTS.md in the PR head and apply it exactly.
+
+          1. If the PR changes no code files (using the exempt list in AGENTS.md
+             Rule 1), PASS.
+          2. FAIL if the change this PR implements is not under
+             openspec/changes/archive/YYYY-MM-DD-<name>/ in the PR head, or still
+             exists in openspec/changes/<name>/.
+          3. FAIL, listing the capabilities, if any specs/<capability>/spec.md in
+             the archived change is not applied to openspec/specs/<capability>/spec.md
+             (ADDED/MODIFIED requirements present, REMOVED ones gone).
+          4. FAIL if the archived tasks.md has unticked tasks, except tasks that
+             are explicitly deferred to another named OpenSpec change.
+          Unrelated changes that are not yet implemented may stay in
+          openspec/changes/. Otherwise PASS.
+
+      - name: "Version bump policy"
+        mode: error
+        instructions: |
+          Enforce AGENTS.md "Rule 3: bump the version when shipped files change,
+          and only then". Read AGENTS.md in the PR head and apply it exactly.
+
+          Shipped files = everything under paseo/ except paseo/tests/**,
+          paseo/CHANGELOG.md, paseo/DOCS.md, paseo/README.md and
+          paseo/translations/**.
+          Compare `version` in paseo/config.yaml between the base branch and the
+          PR head.
+
+          A. If any shipped file changed:
+             - FAIL if the version is unchanged, and list the shipped files.
+             - FAIL if the new version is not higher than the base version, or if
+               it is not in the form <paseo>-<rev>, where <paseo> equals
+               PASEO_VERSION in paseo/build.yaml and <rev> is the base <rev> + 1
+               (or 1 when PASEO_VERSION changed in this PR).
+             - FAIL if paseo/CHANGELOG.md has no "## <new version>" entry at the
+               top, or if that entry does not name the bundled Paseo and Pi
+               versions in bold.
+          B. If no shipped file changed (only documentation, tests, translations,
+             OpenSpec, CI or repo metadata):
+             - FAIL if the version changed, with the message "Documentation-only or
+               non-shipped change: revert the version bump and its CHANGELOG
+               entry".
+          Otherwise PASS.
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+
+chat:
+  auto_reply: true
