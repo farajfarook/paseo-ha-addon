@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.3-8
+
+- Agents can now use git remotes without prompts. See the new **Git access** section in the documentation.
+- The GitHub CLI (`gh` 2.102.0) is built in. Sign in once with `gh auth login` in a Paseo terminal, or add `GH_TOKEN` to `env_vars`. On every start git uses `gh` for `https://github.com` unless you set your own credential helper.
+- SSH keys in `/homeassistant/.ssh` and `/share/.ssh` are used automatically, in place. Keys readable by others are changed to mode `600` (logged), and keys with a passphrase are skipped with a warning.
+- `~/.ssh` is now persistent (`/data/home/.ssh`), so keys you create with `ssh-keygen` survive updates.
+- github.com, gitlab.com and bitbucket.org host keys are built in. Other hosts are accepted on first use and remembered. A changed host key is refused.
+- The start log has a `Git access: ...` line with the keys in use and the GitHub CLI state.
+- `git_snapshot` no longer commits SSH keys. The `.gitignore` it writes now also excludes `.ssh/`, `id_rsa`, `id_ecdsa`, `id_ed25519` (and `_sk` variants), `*.pem` and `*.key`. Public keys can still be committed.
+- A `.gitignore` written by an earlier version of the add-on gets these rules appended once on the next start. A `.gitignore` you wrote yourself is never changed.
+- If SSH keys are already tracked in `/homeassistant`, the start log warns and explains how to untrack them. History is never rewritten, so rotate any key that was pushed.
+- Rollback to an older version: run `git config --global --unset-all credential.https://github.com.helper` and the same for `https://gist.github.com` in a Paseo terminal, because the helper points at `gh`, which older images do not have. Bundled Paseo **0.10.3** is unchanged.
+
 ## 0.10.3-7
 
 - No agent CLI is built into the image any more. Pi is installed on start like Claude, Codex, Copilot, OpenCode and Oh My Pi, and deselecting it in `providers` now uninstalls it. It stays selected by default.

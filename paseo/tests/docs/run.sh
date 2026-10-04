@@ -131,6 +131,15 @@ if [[ -n "${BUILD_PIN}" && "${BUILD_PIN}" == "${DOCKER_PIN}" ]]; then
 else
   bad "PASEO_VERSION differs: build.yaml=${BUILD_PIN:-?} Dockerfile=${DOCKER_PIN:-?}"
 fi
+for pin in HA_CLI_VERSION GH_CLI_VERSION; do
+  b="$(awk -v k="${pin}" '$1 == k":" {print $2; exit}' "${ADDON_DIR}/build.yaml")"
+  d="$(awk -v k="ARG ${pin}=" 'index($0, k) == 1 {print substr($0, length(k) + 1); exit}' "${ADDON_DIR}/Dockerfile")"
+  if [[ -n "${b}" && "${b}" == "${d}" ]]; then
+    ok "${pin} matches build.yaml and Dockerfile (${b})"
+  else
+    bad "${pin} differs: build.yaml=${b:-?} Dockerfile=${d:-?}"
+  fi
+done
 if [[ "${VERSION}" == "${BUILD_PIN}-"* ]]; then
   ok "add-on version ${VERSION} starts with the pinned Paseo ${BUILD_PIN}"
 else
