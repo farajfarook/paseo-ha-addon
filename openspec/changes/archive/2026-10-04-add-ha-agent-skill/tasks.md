@@ -1,0 +1,4 @@
+## 1. Bundled HA guidance
+
+- [x] 1.1 Write the bundled skill `/opt/paseo-ha/skills/home-assistant` (paths, layout, API/CLI recipes, workflow, hard rules) and `AGENTS.base.md`, linked per D12/D14 (see the archived `add-paseo-ha-addon` design.md)
+- [x] 1.2 Verify by asking Pi to "add an automation that turns on <test light> at sunset": it edits the right file, runs check_config, reloads automations, verifies via the API, and doesn't print `secrets.yaml` (verified locally with the add-on image built from this branch, a mock Supervisor serving states, check_config and automation.reload, and Pi 1.0.0 on claude-sonnet-5 via LiteLLM: Pi loaded the home-assistant skill, backed up and edited `automations.yaml`, ran check_config (valid), called automation.reload, confirmed the new automation in `/api/states`, removed its backup, and never read or printed `secrets.yaml` or the token. Not run on the real HA; the mock cannot show Core log output)
