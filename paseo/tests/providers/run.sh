@@ -148,6 +148,13 @@ run_hook '["pi","claude"]'
 installed claude && pass "claude installed on retry" || fail "claude not retried"
 expect_enabled claude=true pi=true
 
+echo "== an install that runs past its time cap counts as a failure"
+run_hook '["pi","opencode"]' PASEO_HA_PROVIDER_INSTALL_TIMEOUT=1
+hook_rc_ok && pass "hook exits 0 after a timed-out install" || fail "hook exit"
+log_has 'ERROR.*opencode' && pass "timed-out install logged" || fail "timed-out install not logged"
+expect_enabled opencode=false pi=true
+run_hook '["pi","claude"]'
+
 echo "== hand-enabled provider is reset; other overrides kept"
 docker exec "${C}" bash -c 'PASEO_HOME=/data/home/.paseo; paseo daemon config set agents.providers "{\"codex\":{\"enabled\":true,\"label\":\"Mine\"},\"pi\":{\"enabled\":true}}" --home $PASEO_HOME >/dev/null'
 run_hook '["pi","claude"]'

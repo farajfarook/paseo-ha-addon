@@ -21,7 +21,10 @@
 # - An upgrade whose CLI fails --version is rolled back to the stamped version and
 #   recorded in /data/agents/.paseo-ha-providers.failed, so that exact version is
 #   not downloaded again. A newer release is tried normally.
-# - Failures are logged per provider and never abort startup.
+# - Failures are logged per provider and never abort startup. Each install is capped
+#   at PASEO_HA_PROVIDER_INSTALL_TIMEOUT seconds (default 600) and each --version
+#   check at 60 s, so a hung registry, install script or CLI counts as a failure
+#   instead of blocking the daemon.
 # - Test seams: PASEO_HA_TEST_FAIL_INSTALL="id,id" makes those installs fail;
 #   PASEO_HA_TEST_FAIL_SPEC="name@ver,..." makes installs of those exact specs fail;
 #   PASEO_HA_TEST_LATEST="name=ver,..." replaces the registry lookup for those
@@ -33,6 +36,7 @@ STAMP="${AGENTS_DIR}/.paseo-ha-providers.stamp"
 FAILED="${AGENTS_DIR}/.paseo-ha-providers.failed"
 BIN_DIR="${AGENTS_DIR}/node_modules/.bin"
 LOOKUP_TIMEOUT="${PASEO_HA_PROVIDER_LOOKUP_TIMEOUT:-20}"   # seconds per package
+INSTALL_TIMEOUT="${PASEO_HA_PROVIDER_INSTALL_TIMEOUT:-600}"  # seconds per provider install (npm and its scripts)
 
 # Every provider Paseo supports, in `providers` option order.
 ALL_PROVIDERS=(claude codex copilot opencode pi omp)
@@ -104,7 +108,7 @@ npm_uninstall() {
 
 # provider_runs <id> -> true when the provider's CLI answers --version.
 provider_runs() {
-  PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[$1]}" --version >/dev/null 2>&1
+  PATH="${BIN_DIR}:${PATH}" timeout -k 5 60 "${BIN_DIR}/${PROVIDER_BIN[$1]}" --version >/dev/null 2>&1
 }
 
 # resolve_pkg <name> -> prints <name>@<version> for the held or latest stable
@@ -140,8 +144,8 @@ install_specs() {
   done
   in_csv "${id}" "${PASEO_HA_TEST_FAIL_INSTALL:-}" && { echo "test seam: ${id} fails" >"${log}"; return 1; }
   # shellcheck disable=SC2086  # specs is a space-separated list
-  npm install --prefix "${AGENTS_DIR}" --no-audit --no-fund --omit=dev --fetch-retries=1 --fetch-timeout=60000 ${specs} >"${log}" 2>&1 \
-    && PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version >>"${log}" 2>&1
+  timeout -k 10 "${INSTALL_TIMEOUT}" npm install --prefix "${AGENTS_DIR}" --no-audit --no-fund --omit=dev --fetch-retries=1 --fetch-timeout=60000 ${specs} >"${log}" 2>&1 \
+    && PATH="${BIN_DIR}:${PATH}" timeout -k 5 60 "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version >>"${log}" 2>&1
 }
 
 log_tail() { grep -v '^[[:space:]]*$' "${log}" | tail -n 5 | while IFS= read -r line; do ph_log_error "  ${line}"; done; }
@@ -203,7 +207,7 @@ for id in "${ALL_PROVIDERS[@]}"; do
   ph_log_info "Installing provider ${id} (${desired}) into ${AGENTS_DIR}..."
   log="$(mktemp)"
   if install_specs "${id}" "${desired}"; then
-    ph_log_info "Installed provider ${id}: $(PATH="${BIN_DIR}:${PATH}" "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version 2>/dev/null | head -n1)"
+    ph_log_info "Installed provider ${id}: $(PATH="${BIN_DIR}:${PATH}" timeout -k 5 60 "${BIN_DIR}/${PROVIDER_BIN[${id}]}" --version 2>/dev/null | head -n1)"
     NEW_STAMP["${id}"]="${desired}"
   elif [[ -n "${old}" && "${old}" != "${desired}" ]]; then
     ph_log_error "Provider ${id} ${desired} could not be installed or does not run on $(uname -m); rolling back to ${old}. Last output:"
