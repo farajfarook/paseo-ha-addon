@@ -26,6 +26,8 @@ NET="${PREFIX}-net"
 APP="${PREFIX}-app"
 SUP="${PREFIX}-sup"
 REG="${PREFIX}-reg"
+GIT="${PREFIX}-git"
+GIT_IMAGE="${GIT_IMAGE:-alpine:3.22}"
 TOKEN="test-supervisor-token"
 SECRET="s3cr3t-value-$$"
 fails=0
@@ -37,7 +39,7 @@ check() { local desc="$1"; shift; if "$@" >/dev/null 2>&1; then pass "${desc}"; 
 in_app() { docker exec "${APP}" bash -c "source /run/paseo-ha/daemon.env; $1"; }
 
 cleanup() {
-  docker rm -f "${APP}" "${SUP}" "${REG}" >/dev/null 2>&1
+  docker rm -f "${APP}" "${SUP}" "${REG}" "${GIT}" >/dev/null 2>&1
   docker network rm "${NET}" >/dev/null 2>&1
   docker run --rm -v "$(hostpath "${WORK}"):/w" --entrypoint sh "${IMAGE}" -c 'rm -rf /w/*' >/dev/null 2>&1
   rm -rf "${WORK}"
@@ -201,9 +203,15 @@ check "workspace project registered" in_app 'paseo project ls --home $PASEO_HOME
 check "HA project still single" in_app 'paseo project ls --home $PASEO_HOME --json | jq -e "[.[] | select(.path==\"/homeassistant\")] | length == 1"'
 
 # --- 6. git_snapshot -----------------------------------------------------------
+mkdir -p "${WORK}/ha/.ssh"
+echo "FAKE-PRIVATE-KEY" > "${WORK}/ha/.ssh/id_ed25519"
+echo "ssh-ed25519 AAAA fake" > "${WORK}/ha/.ssh/id_ed25519.pub"
+echo "FAKE-PRIVATE-KEY" > "${WORK}/ha/deploy.pem"
 options true /homeassistant
 restart_app
 check "git repo created" test -d "${WORK}/ha/.git"
+check "SSH keys not in initial snapshot" in_app 'cd /homeassistant && [ -z "$(git ls-files .ssh deploy.pem)" ]'
+check "generated .gitignore has SSH rules" grep -qx ".ssh/" "${WORK}/ha/.gitignore"
 check "secrets/.storage/db ignored" in_app 'cd /homeassistant && [ -z "$(git ls-files secrets.yaml .storage home-assistant_v2.db)" ] && [ -z "$(git status --porcelain)" ]'
 check "initial commit by Paseo Agent" in_app 'cd /homeassistant && git log -1 --format=%an | grep -qx "Paseo Agent"'
 check "safe.directory set" in_app 'git config --global --get-all safe.directory | grep -qx /homeassistant'
@@ -214,6 +222,28 @@ echo "# user" >> "${WORK}/ha/.gitignore"
 restart_app
 check "existing repo left unchanged" test "$(in_app 'git -C /homeassistant rev-parse HEAD')" = "${head_before}"
 check "existing .gitignore kept" grep -qx "# user" "${WORK}/ha/.gitignore"
+
+# An add-on .gitignore from before the SSH rules gets them appended once.
+cp "${WORK}/ha/.gitignore" "${WORK}/gitignore.saved"
+printf '%s\nsecrets.yaml\n.storage/\n' "# Written by the Paseo add-on (git_snapshot). Secrets and runtime state stay out of git." > "${WORK}/ha/.gitignore"
+restart_app
+restart_app
+check "old add-on .gitignore: SSH rules appended once" test "$(grep -cx '.ssh/' "${WORK}/ha/.gitignore")" = 1
+check "old add-on .gitignore: earlier lines kept" grep -qx ".storage/" "${WORK}/ha/.gitignore"
+check "history unchanged by .gitignore update" test "$(in_app 'git -C /homeassistant rev-parse HEAD')" = "${head_before}"
+
+# A user .gitignore is never changed; tracked keys only produce a warning.
+printf '# user ignore\nsecrets.yaml\n.storage/\n*.db\n' > "${WORK}/ha/.gitignore"
+in_app 'cd /homeassistant && git add -f .ssh/id_ed25519 && git commit -qm "track a key"'
+head_key="$(in_app 'git -C /homeassistant rev-parse HEAD')"
+sum_before="$(md5sum < "${WORK}/ha/.gitignore")"
+restart_app
+check "user .gitignore unchanged" test "$(md5sum < "${WORK}/ha/.gitignore")" = "${sum_before}"
+check "tracked key warning logged" grep -q 'SSH key file(s) are tracked in /homeassistant: .ssh/id_ed25519' <<<"$(last_start_log)"
+check "no key material in log" bash -c '! grep -q FAKE-PRIVATE-KEY <<<"$1"' _ "$(docker logs "${APP}" 2>&1)"
+check "repo untouched by warning" test "$(in_app 'git -C /homeassistant rev-parse HEAD')" = "${head_key}"
+in_app 'cd /homeassistant && git rm -q --cached .ssh/id_ed25519 && git commit -qm "untrack key"'
+cp "${WORK}/gitignore.saved" "${WORK}/ha/.gitignore"
 
 # --- 8. Default Pi packages (36-pi-packages.sh) ---------------------------------
 set_defaults() { printf 'npm:%s\n' "$@" > "${WORK}/pidef/list"; }   # one default per line
@@ -333,6 +363,78 @@ check "openai speech: dictation stays on" in_app '[ "$PASEO_DICTATION_ENABLED" =
 check "openai speech: voice mode stays on" in_app '[ "$PASEO_VOICE_MODE_ENABLED" = true ]'
 check "openai speech: no unavailable warning" test "$(last_start_log | grep -c "cannot load on this platform")" = 0
 check "openai speech: no models directory" in_app '[ ! -e "$PASEO_HOME/models/local-speech" ]'
+
+# --- 9. Git access (47-git-auth.sh) --------------------------------------------
+# A throwaway git-over-ssh server (alpine + openssh + git) on the test network.
+start_git_server() { # start_git_server -> fresh host key each time
+  docker rm -f "${GIT}" >/dev/null 2>&1
+  docker run -d --name "${GIT}" --network "${NET}" --network-alias gitsrv \
+    -v "$(hostpath "${WORK}/gitsrv"):/srv" --entrypoint sh "${GIT_IMAGE}" -c '
+      apk add -q --no-cache openssh-server git >/dev/null &&
+      ssh-keygen -A >/dev/null &&
+      adduser -D -s /usr/bin/git-shell git && passwd -u git >/dev/null 2>&1;
+      mkdir -p /home/git/.ssh && cp /srv/authorized_keys /home/git/.ssh/ &&
+      chown -R git /home/git/.ssh && chmod 700 /home/git/.ssh && chmod 600 /home/git/.ssh/authorized_keys &&
+      { [ -d /home/git/repo.git ] || git init -q --bare -b main /home/git/repo.git; } && chown -R git /home/git/repo.git &&
+      exec /usr/sbin/sshd -D -e' >/dev/null
+  for _ in $(seq 1 60); do
+    docker logs "${GIT}" 2>&1 | grep -q "Server listening" && return 0
+    sleep 1
+  done
+  echo "git server did not start"; docker logs "${GIT}" 2>&1 | tail -5
+}
+clone_ok() { in_app 'rm -rf /tmp/c && timeout 30 git clone -q git@gitsrv:repo.git /tmp/c'; }
+
+mkdir -p "${WORK}/gitsrv" "${WORK}/share/.ssh"
+rm -rf "${WORK}/ha/.ssh"; mkdir -p "${WORK}/ha/.ssh"
+in_app 'ssh-keygen -q -t ed25519 -N "" -C ha -f /homeassistant/.ssh/id_ed25519 && chmod 644 /homeassistant/.ssh/id_ed25519'
+in_app 'ssh-keygen -q -t ed25519 -N secret -C enc -f /share/.ssh/locked'
+cat "${WORK}/ha/.ssh/id_ed25519.pub" > "${WORK}/gitsrv/authorized_keys"
+set_env_vars() { # set_env_vars <json array> (single-line options.json key; no host jq needed)
+  sed -i -E "s/\"env_vars\":\[[^]]*\]/\"env_vars\":$1/" "${WORK}/data/options.json"
+}
+set_env_vars '[{"name":"GH_TOKEN","value":"dummy-gh-token"}]'
+start_git_server
+restart_app
+log="$(last_start_log)"
+check "gh version matches the pin" in_app "gh --version | grep -q \"gh version $(awk '/^ *GH_CLI_VERSION:/{print $2; exit}' "${HERE}/../../build.yaml") \""
+check "gh is git's helper for github.com" in_app 'git config --global --get-all credential.https://github.com.helper | grep -qx "!/usr/local/bin/gh auth git-credential"'
+check "GH_TOKEN reaches git over HTTPS" in_app 'printf "protocol=https\nhost=github.com\n\n" | git credential fill | grep -qx password=dummy-gh-token'
+check "loose key permissions fixed" test "$(in_app 'stat -c %a /homeassistant/.ssh/id_ed25519')" = 600
+check "permission fix logged" grep -q "restricted permissions of /homeassistant/.ssh/id_ed25519" <<<"${log}"
+check "passphrase key skipped with warning" grep -q "skipping /share/.ssh/locked" <<<"${log}"
+check "start log names key and gh state" grep -q "Git access: SSH keys /homeassistant/.ssh/id_ed25519; GitHub CLI uses a token from GH_TOKEN" <<<"${log}"
+check "no token or key material in log" bash -c '! grep -qE "dummy-gh-token|PRIVATE KEY" <<<"$1"' _ "$(docker logs "${APP}" 2>&1)"
+check "clone over ssh with HA key, no prompt" clone_ok
+check "new host remembered in /data" grep -q "^gitsrv " "${WORK}/data/home/.ssh/known_hosts"
+check "bundled host keys trusted" in_app 'ssh-keygen -F github.com -f /opt/paseo-ha/ssh_known_hosts >/dev/null && ssh -G github.com | grep -q "^globalknownhostsfile /opt/paseo-ha/ssh_known_hosts"'
+check "no copy of the key under /data" bash -c '! grep -rlq "$(sed -n 2p "$1")" "$2"' _ "${WORK}/ha/.ssh/id_ed25519" "${WORK}/data"
+
+# User ~/.ssh/config comes first; a custom credential helper is kept.
+in_app 'printf "Host gitsrv\n  IdentityFile /data/home/.ssh/pinned\n" > ~/.ssh/config && git config --global --replace-all credential.https://github.com.helper store'
+restart_app
+check "user ssh config IdentityFile first" test "$(in_app 'ssh -G gitsrv | grep -m1 ^identityfile')" = "identityfile /data/home/.ssh/pinned"
+check "discovered key still offered" in_app 'ssh -G gitsrv | grep -qx "identityfile /homeassistant/.ssh/id_ed25519"'
+check "custom credential helper kept" test "$(in_app 'git config --global --get-all credential.https://github.com.helper')" = store
+in_app 'rm -f ~/.ssh/config; git config --global --unset-all credential.https://github.com.helper'
+
+# Host key change is refused.
+start_git_server
+host_key_refused() { ! clone_ok && grep -q "HOST IDENTIFICATION HAS CHANGED" <<<"$(in_app 'timeout 30 ssh git@gitsrv 2>&1')"; }
+check "changed host key refused" host_key_refused
+in_app 'ssh-keygen -q -R gitsrv -f /data/home/.ssh/known_hosts' >/dev/null 2>&1
+
+# Removed key is dropped; own key from ssh-keygen persists across container recreation.
+rm -f "${WORK}/ha/.ssh/id_ed25519" "${WORK}/ha/.ssh/id_ed25519.pub"
+in_app 'ssh-keygen -q -t ed25519 -N "" -C own -f ~/.ssh/id_ed25519'
+cat "${WORK}/data/home/.ssh/id_ed25519.pub" > "${WORK}/gitsrv/authorized_keys"
+set_env_vars '[]'
+start_git_server
+start_app   # recreate: simulates an add-on update
+check "removed key no longer referenced" bash -c '! docker exec "$1" ssh -G gitsrv | grep -q /homeassistant/.ssh/id_ed25519' _ "${APP}"
+check "own key persisted under /data" test -f "${WORK}/data/home/.ssh/id_ed25519"
+check "clone with own key after recreate" clone_ok
+check "gh not signed in reported" grep -q "GitHub CLI not signed in" <<<"$(last_start_log)"
 
 echo
 if [[ "${fails}" -eq 0 ]]; then echo "ALL PASSED"; else echo "${fails} FAILED"; fi

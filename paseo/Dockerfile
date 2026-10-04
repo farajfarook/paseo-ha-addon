@@ -42,6 +42,25 @@ RUN set -eu; \
     chmod 755 /usr/local/bin/ha; \
     /usr/local/bin/ha help >/dev/null
 
+# Static GitHub CLI (`gh`) from cli/cli releases, verified against the release
+# checksums. Agents use it for GitHub and as git's HTTPS credential helper.
+ARG GH_CLI_VERSION=2.102.0
+RUN set -eu; \
+    case "${BUILD_ARCH:-${TARGETARCH:-$(uname -m)}}" in \
+      amd64|x86_64) arch=amd64 ;; \
+      aarch64|arm64) arch=arm64 ;; \
+      *) echo "unsupported architecture for gh" >&2; exit 1 ;; \
+    esac; \
+    v="$GH_CLI_VERSION"; base="https://github.com/cli/cli/releases/download/v${v}"; \
+    tgz="gh_${v}_linux_${arch}.tar.gz"; \
+    cd /tmp; \
+    curl -fsSLO "${base}/${tgz}"; \
+    curl -fsSL "${base}/gh_${v}_checksums.txt" | grep " ${tgz}\$" | sha256sum -c -; \
+    tar -xzf "${tgz}"; \
+    install -m 755 "gh_${v}_linux_${arch}/bin/gh" /usr/local/bin/gh; \
+    rm -rf /tmp/gh_*; \
+    /usr/local/bin/gh --version
+
 # ---------------------------------------------------------------------------
 # Runtime image
 # ---------------------------------------------------------------------------
@@ -59,11 +78,12 @@ RUN apk add --no-cache nodejs npm nginx git openssh-client bash curl jq libstdc+
 
 COPY --from=build /opt/node /opt/node
 COPY --from=build /usr/local/bin/ha /usr/local/bin/ha
+COPY --from=build /usr/local/bin/gh /usr/local/bin/gh
 COPY rootfs /
 
 RUN chmod +x /usr/local/bin/paseo-ha-* /etc/s6-overlay/scripts/*.sh \
       /etc/s6-overlay/s6-rc.d/*/run /etc/s6-overlay/s6-rc.d/*/finish \
- && node --version && paseo --version && ha help >/dev/null
+ && node --version && paseo --version && ha help >/dev/null && gh --version
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
   CMD curl -fsS -o /dev/null --max-time 8 http://127.0.0.1:6767/api/health || exit 1
