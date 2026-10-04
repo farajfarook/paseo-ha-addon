@@ -4,6 +4,11 @@ Guidance for coding agents and reviewers (including CodeRabbit) working in this
 repository. These rules are the single source of truth: `.coderabbit.yaml`
 points its review guidelines and pre-merge checks at this file.
 
+Checks apply the rules from the **base branch** copy of this file. A PR that
+changes `AGENTS.md` or `.coderabbit.yaml` does not relax its own checks. Policy
+changes take effect only after the owner (`.github/CODEOWNERS`) approves them
+and they are merged.
+
 ## Repository
 
 Home Assistant add-on repository for [Paseo](https://paseo.sh), a self-hosted
@@ -71,14 +76,16 @@ Merging a version bump to `main` *is* the release (`tag.yaml` tags it and
 **Shipped files** are everything under `paseo/` **except** `paseo/tests/**`,
 `paseo/CHANGELOG.md`, `paseo/DOCS.md`, `paseo/README.md` and
 `paseo/translations/**` (the same list as the `version-bump` job in
-`.github/workflows/lint.yaml`).
+`.github/workflows/lint.yaml`). For this rule `paseo/config.yaml` counts as
+changed only when content outside its top-level `version` field changes.
 
-- **A shipped file changed:** bump `version` in `paseo/config.yaml` (compared
+- **Shipped content changed:** bump `version` in `paseo/config.yaml` (compared
   with the base branch) and add a matching `## <version>` entry at the top of
   `paseo/CHANGELOG.md`.
-- **Only documentation, tests, translations, OpenSpec, CI or repo metadata
-  changed:** do **not** bump the version. A needless bump publishes a release
-  that contains no change.
+- **No shipped content changed** (only documentation, tests, translations,
+  OpenSpec, CI or repo metadata): do **not** bump the version. A PR that only
+  changes `version` and adds its changelog entry also counts as no shipped
+  content. A needless bump publishes a release that contains no change.
 - **Version format** is `<paseo>-<rev>`: the pinned Paseo release plus an add-on
   revision. A normal change increments `<rev>` (`0.10.3-6` → `0.10.3-7`).
   Bumping `PASEO_VERSION` resets it (`0.10.3-7` → `0.10.4-1`), and the

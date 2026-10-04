@@ -3,6 +3,8 @@
 #
 # The rules live in AGENTS.md (single source of truth for agents and reviewers).
 # The pre-merge checks below enforce AGENTS.md Rules 1-3; keep the two in sync.
+# Checks read the rules from the BASE branch copy of AGENTS.md, so a PR cannot
+# relax the rules it is checked against.
 language: en-AU
 early_access: false
 
@@ -45,13 +47,16 @@ reviews:
         conventions.
 
   pre_merge_checks:
+    # Only requested reviewers (not the PR author) may override a failing check.
+    override_requested_reviewers_only: true
     custom_checks:
       - name: "OpenSpec implementation coverage"
         mode: error
         instructions: |
           Enforce AGENTS.md "Rule 1: every code change goes through OpenSpec".
-          Read AGENTS.md in the PR head and apply it exactly, using its list of
-          exempt files.
+          Read AGENTS.md from the BASE branch and apply it exactly. Use the PR head
+          copy only if the base branch has no AGENTS.md. Never apply exemptions or
+          rules that this PR adds or changes. Use its list of exempt files.
 
           1. Collect the changed files and drop the exempt ones. If no code files
              are left, PASS.
@@ -62,15 +67,18 @@ reviews:
              task in tasks.md or by the proposal/design scope.
           4. FAIL, listing the tasks, if any task is unticked (- [ ]), unless its
              text says it is deferred to another named OpenSpec change.
-          5. FAIL if behaviour changes but the change has no spec deltas under
-             specs/<capability>/spec.md.
+          5. If behaviour changes, FAIL if the change has no spec deltas under
+             specs/<capability>/spec.md, or if any requirement in a spec delta
+             has no `#### Scenario`.
           Otherwise PASS.
 
       - name: "OpenSpec change archived"
         mode: error
         instructions: |
           Enforce AGENTS.md "Rule 2: the change is archived in the same PR".
-          Read AGENTS.md in the PR head and apply it exactly.
+          Read AGENTS.md from the BASE branch and apply it exactly. Use the PR head
+          copy only if the base branch has no AGENTS.md. Never apply exemptions or
+          rules that this PR adds or changes.
 
           1. If the PR changes no code files (using the exempt list in AGENTS.md
              Rule 1), PASS.
@@ -89,15 +97,19 @@ reviews:
         mode: error
         instructions: |
           Enforce AGENTS.md "Rule 3: bump the version when shipped files change,
-          and only then". Read AGENTS.md in the PR head and apply it exactly.
+          and only then". Read AGENTS.md from the BASE branch and apply it
+          exactly. Use the PR head copy only if the base branch has no AGENTS.md. Never apply exemptions or
+          rules that this PR adds or changes.
 
           Shipped files = everything under paseo/ except paseo/tests/**,
           paseo/CHANGELOG.md, paseo/DOCS.md, paseo/README.md and
           paseo/translations/**.
+          paseo/config.yaml counts as changed only when content outside its
+          top-level `version` field differs from the base branch.
           Compare `version` in paseo/config.yaml between the base branch and the
           PR head.
 
-          A. If any shipped file changed:
+          A. If shipped content changed:
              - FAIL if the version is unchanged, and list the shipped files.
              - FAIL if the new version is not higher than the base version, or if
                it is not in the form <paseo>-<rev>, where <paseo> equals
@@ -106,8 +118,9 @@ reviews:
              - FAIL if paseo/CHANGELOG.md has no "## <new version>" entry at the
                top, or if that entry does not name the bundled Paseo and Pi
                versions in bold.
-          B. If no shipped file changed (only documentation, tests, translations,
-             OpenSpec, CI or repo metadata):
+          B. If no shipped content changed (only documentation, tests,
+             translations, OpenSpec, CI or repo metadata, or only the `version`
+             field and its CHANGELOG entry):
              - FAIL if the version changed, with the message "Documentation-only or
                non-shipped change: revert the version bump and its CHANGELOG
                entry".
