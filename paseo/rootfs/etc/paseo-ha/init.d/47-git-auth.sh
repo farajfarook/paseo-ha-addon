@@ -30,8 +30,12 @@ ph_ssh_home() {
     rm -f "${PH_SSH_ROOT_LINK}"
   elif [[ -d "${PH_SSH_ROOT_LINK}" ]]; then
     # Only the image or an earlier session in this container could have made it.
-    cp -an "${PH_SSH_ROOT_LINK}/." "${PH_SSH_DIR}/" 2>/dev/null
-    rm -rf "${PH_SSH_ROOT_LINK}"
+    if cp -an "${PH_SSH_ROOT_LINK}/." "${PH_SSH_DIR}/" 2>/dev/null; then
+      rm -rf "${PH_SSH_ROOT_LINK}"
+    else
+      ph_log_warn "Git access: could not move ${PH_SSH_ROOT_LINK} to ${PH_SSH_DIR}; leaving it in place"
+      return 0
+    fi
   fi
   mkdir -p "$(dirname "${PH_SSH_ROOT_LINK}")"
   ln -s "${PH_SSH_DIR}" "${PH_SSH_ROOT_LINK}"
