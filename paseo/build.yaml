@@ -8,5 +8,4 @@ labels:
   org.opencontainers.image.licenses: Apache-2.0
 args:
   PASEO_VERSION: 0.10.3
-  PI_VERSION: 1.0.0
   HA_CLI_VERSION: 5.5.0

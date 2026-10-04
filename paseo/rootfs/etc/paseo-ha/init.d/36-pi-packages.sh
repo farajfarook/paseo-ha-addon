@@ -14,6 +14,7 @@
 # - A failed install is logged and NOT recorded, so the next start retries it.
 # - All installs share one time budget (PASEO_HA_PI_BUDGET, default 600 s) so a stalled
 #   registry cannot hold up the daemon; unfinished defaults are retried on the next start.
+# - Skipped entirely while Pi is not installed (not selected, or its install failed).
 # - Never aborts startup.
 # ==============================================================================
 
@@ -129,6 +130,13 @@ ph_pi_offer_defaults() {
     rm -f "${log}"
   done < "${DEFAULTS_FILE}"
 }
+
+# Pi is installed by 20-providers only when selected. Without it, offer nothing, so
+# the defaults are offered on the first start that has Pi.
+if ! command -v pi >/dev/null 2>&1; then
+  ph_log_info "Pi is not installed; skipping default Pi packages"
+  exit 0
+fi
 
 ph_pi_offer_defaults || ph_log_warn "Default Pi package setup hit an error (continuing)"
 ph_pi_log_installed
