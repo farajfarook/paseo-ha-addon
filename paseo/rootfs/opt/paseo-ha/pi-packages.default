@@ -1,0 +1,20 @@
+# Default Pi packages (https://pi.dev/packages) offered by the Paseo add-on.
+#
+# One Pi package source per line: npm:<name>[@version] or git:<host>/<path>[@ref].
+# Blank lines and lines starting with # are ignored. Pin versions so installs are
+# reproducible.
+#
+# On start, the add-on installs every source here that it has not offered before on
+# this installation (tracked by package name, ignoring version), then records it in
+# /data/paseo-ha/pi-packages.offered. Pi's own settings are the source of truth after
+# that: `pi remove <source>` sticks and `pi install <source>` persists. Edit this file
+# in the repository, not on a running add-on; it is replaced on every add-on update.
+#
+# Paseo shows these three in its UI (todo panel, question dialogs, sub-agent activity):
+npm:@juicesharp/rpiv-todo@2.12.0
+npm:@juicesharp/rpiv-ask-user-question@2.12.0
+npm:pi-subagents@0.75.0
+# Use models through a LiteLLM proxy (configure with /login litellm or env_vars).
+npm:pi-provider-litellm@3.3.0
+# Web search and page fetching (works without an API key).
+npm:pi-web-access@0.35.0

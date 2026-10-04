@@ -1,5 +1,5 @@
 name: Paseo
-version: "0.10.3-5"
+version: "0.10.3-6"
 slug: paseo
 description: Configure Home Assistant with coding agents (Pi, Claude, Codex, Copilot, OpenCode, Oh My Pi) from the sidebar
 url: https://github.com/farajfarook/paseo-ha-addon

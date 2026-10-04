@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.3-6
+
+- Install a set of default Pi packages on first start: `@juicesharp/rpiv-todo` and `@juicesharp/rpiv-ask-user-question` (the todo list and question dialogs Paseo shows for Pi), `pi-subagents`, `pi-provider-litellm` and `pi-web-access`.
+- Manage packages with `pi install`, `pi remove` and `pi list` in a Paseo terminal. Your changes persist across restarts, add-on updates and backups, and a default you remove stays removed. Nothing to configure and no new options.
+- Defaults are installed over the network on the first start after this update, so that start takes longer. A failed install is logged and retried on the next start.
+
 ## 0.10.3-5
 
 - **BREAKING:** the `agents` option is replaced by `providers`, a multi-select of Paseo's six providers (`claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`) that defaults to `[pi]`. There is no migration: remove and reinstall the add-on, then pick your providers again.
