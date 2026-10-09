@@ -87,7 +87,7 @@ add-on start.
 |---|---|---|
 | `workspace` | string, `/homeassistant` | Directory new terminals and agent sessions start in. Created if missing. Set it to another mapped path (e.g. `/share/paseo`) to work somewhere else by default. |
 | `git_snapshot` | boolean, `false` | Keep `/homeassistant` under git for review and rollback. See [Git snapshots](#git-snapshots-and-rollback). |
-| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi, `muse` is Muse Code). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` are installed from npm at their latest stable release; `muse` and `antigravity` are not on npm, so their vendor's installer runs once (Muse Code is a ~336 MB download) and the CLI updates itself afterwards. Pi is installed the same way as the npm ones and is selected by default. Nothing is downloaded for a provider whose CLI already runs, and a failed install only disables that provider. See [Agent providers](#agent-providers). |
+| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi, `muse` is Muse Code). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` are installed from npm at their latest stable release; `muse` and `antigravity` are not on npm, so their vendor's installer runs once (Muse Code is a ~336 MB download) and the CLI updates itself afterwards. Pi is installed the same way as the npm ones and is selected by default. A working `muse` or `antigravity` CLI is never downloaded again; an npm provider is downloaded again only when a newer stable release is out. A failed install only disables that provider. See [Agent providers](#agent-providers). |
 | `env_vars` | list of `{name, value}`, `[]` | Environment variables exported to the daemon and therefore to every agent — e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`. **Only the names are logged, never the values.** |
 | `password` | string, empty | Password required for direct-port access. It is never asked for on the sidebar/ingress path. See [Relay vs. direct port](#remote-access-relay-vs-direct-port). |
 | `hostnames` | list of strings, `[]` | Extra DNS names the daemon accepts on the direct port (`PASEO_HOSTNAMES`), e.g. `paseo.example.com`, when you reach HA through a proxy or a custom name. |
@@ -242,8 +242,9 @@ HA backups. They are never written to the editable `/config` folder.
 All agent CLIs come from the `providers` option. The npm ones are installed with npm into
 `/data/agents/node_modules`, the vendor-installed ones into `/data/agents/bin/<provider>`,
 and both are put first on `PATH`. Expect the first start after a change to take a while:
-Muse Code alone is a ~336 MB download. Later starts only make a quick version check per
-provider and download nothing unless a newer npm release is out.
+Muse Code alone is a ~336 MB download. On later starts each npm provider gets a quick
+check against the npm registry and is downloaded again only when a newer stable release is
+out; a vendor-installed CLI that still runs is never downloaded again.
 
 ## Git access
 

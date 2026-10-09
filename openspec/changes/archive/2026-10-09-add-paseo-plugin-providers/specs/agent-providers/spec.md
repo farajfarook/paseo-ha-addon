@@ -46,7 +46,7 @@ On each start, the add-on SHALL install the CLI of every selected provider, Pi i
 
 #### Scenario: Deselect a vendor-installed provider
 - **WHEN** the user removes `muse` from `providers` and restarts the add-on
-- **THEN** every file the Muse Code installer put in persistent storage is removed, the `muse` command no longer exists in the container, and its login is kept
+- **THEN** the provider directory `/data/agents/bin/muse` is removed, the `muse` command no longer exists in the container, and its login and anything else under `/data/home` (including PATH lines the vendor installer added to shell profiles) are kept
 
 ### Requirement: Paseo providers follow the selection
 On each start, before the daemon serves clients, the add-on SHALL turn on in Paseo every selected provider whose CLI is usable, and SHALL turn off every other supported provider. The add-on's selection SHALL override changes made in Paseo's settings.

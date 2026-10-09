@@ -240,9 +240,10 @@ sum_before="$(md5sum < "${WORK}/ha/.gitignore")"
 restart_app
 check "user .gitignore unchanged" test "$(md5sum < "${WORK}/ha/.gitignore")" = "${sum_before}"
 check "tracked key warning logged" grep -q 'SSH key file(s) are tracked in /homeassistant: .ssh/id_ed25519' <<<"$(last_start_log)"
-# The log is streamed into grep: passed as one argument it can exceed the kernel's
-# 128 KB single-argument limit (Paseo 0.11 logs every bundled plugin on each start).
-check "no key material in log" bash -c '! docker logs "$1" 2>&1 | grep -q FAKE-PRIVATE-KEY' _ "${APP}"
+# The log goes through a file: passed as one argument it can exceed the kernel's 128 KB
+# single-argument limit (Paseo 0.11 logs every bundled plugin on each start), and a
+# failed `docker logs` must fail the check instead of looking like a clean log.
+check "no key material in log" bash -c 'docker logs "$1" > "$2" 2>&1 && ! grep -q FAKE-PRIVATE-KEY "$2"' _ "${APP}" "${WORK}/app.log"
 check "repo untouched by warning" test "$(in_app 'git -C /homeassistant rev-parse HEAD')" = "${head_key}"
 in_app 'cd /homeassistant && git rm -q --cached .ssh/id_ed25519 && git commit -qm "untrack key"'
 cp "${WORK}/gitignore.saved" "${WORK}/ha/.gitignore"
@@ -406,7 +407,7 @@ check "loose key permissions fixed" test "$(in_app 'stat -c %a /homeassistant/.s
 check "permission fix logged" grep -q "restricted permissions of /homeassistant/.ssh/id_ed25519" <<<"${log}"
 check "passphrase key skipped with warning" grep -q "skipping /share/.ssh/locked" <<<"${log}"
 check "start log names key and gh state" grep -q "Git access: SSH keys /homeassistant/.ssh/id_ed25519; GitHub CLI uses a token from GH_TOKEN" <<<"${log}"
-check "no token or key material in log" bash -c '! docker logs "$1" 2>&1 | grep -qE "dummy-gh-token|PRIVATE KEY"' _ "${APP}"
+check "no token or key material in log" bash -c 'docker logs "$1" > "$2" 2>&1 && ! grep -qE "dummy-gh-token|PRIVATE KEY" "$2"' _ "${APP}" "${WORK}/app.log"
 check "clone over ssh with HA key, no prompt" clone_ok
 check "new host remembered in /data" grep -q "^gitsrv " "${WORK}/data/home/.ssh/known_hosts"
 check "bundled host keys trusted" in_app 'ssh-keygen -F github.com -f /opt/paseo-ha/ssh_known_hosts >/dev/null && ssh -G github.com | grep -q "^globalknownhostsfile /opt/paseo-ha/ssh_known_hosts"'
