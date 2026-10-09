@@ -9,7 +9,7 @@ ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 # node-gyp).
 # ---------------------------------------------------------------------------
 FROM ${BUILD_FROM} AS build
-ARG PASEO_VERSION=0.10.3
+ARG PASEO_VERSION=0.11.1
 ENV ONNXRUNTIME_NODE_INSTALL=skip \
     npm_config_update_notifier=false \
     npm_config_fund=false \
@@ -65,7 +65,7 @@ RUN set -eu; \
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM ${BUILD_FROM}
-ARG PASEO_VERSION=0.10.3
+ARG PASEO_VERSION=0.11.1
 ENV ONNXRUNTIME_NODE_INSTALL=skip \
     npm_config_update_notifier=false \
     npm_config_fund=false \

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.1-1
+
+- Bundled Paseo **0.11.1** (was 0.10.3). Two new agent providers come with it: **Muse Code** (`muse`, Meta) and **Antigravity** (`antigravity`, Google). Both appear in the `providers` option, and Paseo's own Usage screen, plugin registry and provider fixes come along with the upgrade. The ingress adapter needed no change: the anchors it rewrites are identical in 0.11.1.
+- **Muse Code and Antigravity are not npm packages**, so the add-on installs them with the vendor's own installer instead of npm: Muse Code from `https://dev.meta.ai/install.sh` and Antigravity from `https://antigravity.google/cli/install.sh`. Each goes into a directory of its own under `/data/agents/bin` and is put on `PATH`. The installer runs once and the CLI updates itself afterwards: each start only checks that it still runs. Deselecting one deletes that directory and keeps its login.
+- Muse Code is a large download (about 336 MB) on the first start after you select it. No provider is downloaded unless you select it, and nothing is downloaded for one that already runs.
+- Agents on `muse` or `antigravity` do not get the bundled Home Assistant skill, instructions or MCP tools yet; that needs a separate change. See **Known limitations**.
+- Bundled Paseo **0.11.1** and Pi **1.1.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.10.3-9
 
 - Fix the sidebar panel staying on **Reconnecting to host** and showing old sessions after the add-on is uninstalled and installed again. The daemon's server ID now survives a reinstall: on a fresh install it is derived from your Home Assistant instance ID and the add-on, so the same add-on gets the same ID back. If the instance ID can't be read, a random ID is used and a later reinstall gets a new one, which the panel then heals. An existing ID is never changed.
