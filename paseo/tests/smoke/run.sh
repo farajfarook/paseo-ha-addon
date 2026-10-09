@@ -173,11 +173,22 @@ fi
 # --- c) WebSocket upgrade on /ws -------------------------------------------------
 # curl gets 101 and then idles on the open socket until --max-time; -w still
 # reports the status code.
-code="$(docker exec "${CLIENT}" curl -s --http1.1 --max-time 5 -o /dev/null -w '%{http_code}' \
-  -H "X-Ingress-Path: ${INGRESS_PATH}" \
-  -H "Connection: Upgrade" -H "Upgrade: websocket" \
-  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  "${BASE}/ws" || true)"
+# Retried briefly: a just-started 0.11.x daemon answers /api/health before its
+# WebSocket listener binds, so the first upgrade after a start can get a 503.
+# Paseo's own client retries, so the check is that the panel can connect, not
+# that it can on the first packet.
+tries=0
+while :; do
+  code="$(docker exec "${CLIENT}" curl -s --http1.1 --max-time 5 -o /dev/null -w '%{http_code}' \
+    -H "X-Ingress-Path: ${INGRESS_PATH}" \
+    -H "Connection: Upgrade" -H "Upgrade: websocket" \
+    -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+    "${BASE}/ws" || true)"
+  if [[ "${code}" == "101" ]]; then break; fi
+  tries=$((tries + 1))
+  if (( tries >= 10 )); then break; fi
+  sleep 1
+done
 if [[ "${code}" == "101" ]]; then pass "c) WebSocket upgrade on /ws -> 101"
 else fail "c) WebSocket upgrade on /ws -> ${code:-no response} (want 101)"; fi
 

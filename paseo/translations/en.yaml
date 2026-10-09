@@ -7,7 +7,7 @@ configuration:
     description: Keep /homeassistant under git (initialised once, secrets and runtime files ignored) so agent changes can be reviewed and reverted. Never modifies an existing repository.
   providers:
     name: Agent providers
-    description: Agent providers to offer in Paseo (claude, codex, copilot, opencode, pi, omp = Oh My Pi). Selected providers are installed at their latest stable release on every start and enabled in Paseo; deselected ones are uninstalled and disabled. Pi is selected by default. Applied on every start, so it overrides provider toggles made in Paseo.
+    description: Agent providers to offer in Paseo (claude, codex, copilot, opencode, pi, omp = Oh My Pi, muse = Muse Code, antigravity). claude, codex, copilot, opencode, pi and omp are installed at their latest stable npm release on every start. muse and antigravity are not on npm, so their vendor's installer runs once (Muse Code downloads about 336 MB) and the CLI updates itself afterwards. Selected providers are enabled in Paseo; deselected ones are removed and disabled. Pi is selected by default. Applied on every start, so it overrides provider toggles made in Paseo.
   env_vars:
     name: Environment variables
     description: Variables (e.g. ANTHROPIC_API_KEY, OPENAI_API_KEY) exported to the Paseo daemon and every agent. Only names are logged, never values.

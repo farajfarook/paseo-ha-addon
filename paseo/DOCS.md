@@ -11,8 +11,9 @@ agent can read and edit your Home Assistant configuration and check its work aga
 live API instead of guessing.
 
 Pick the agents you want in the `providers` option (Pi, Claude, Codex, Copilot, OpenCode,
-Oh My Pi; Pi by default). On every start the add-on installs the latest stable release of
-each selected CLI and enables it in Paseo. The first start needs internet access.
+Oh My Pi, Muse Code, Antigravity; Pi by default). On every start the add-on installs the
+latest stable release of each selected npm CLI, installs the two remaining ones with their
+vendor's own installer, and enables each in Paseo. The first start needs internet access.
 
 ## Table of contents
 
@@ -86,7 +87,7 @@ add-on start.
 |---|---|---|
 | `workspace` | string, `/homeassistant` | Directory new terminals and agent sessions start in. Created if missing. Set it to another mapped path (e.g. `/share/paseo`) to work somewhere else by default. |
 | `git_snapshot` | boolean, `false` | Keep `/homeassistant` under git for review and rollback. See [Git snapshots](#git-snapshots-and-rollback). |
-| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi). Selected providers have the latest stable release of their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. Pi is installed the same way as the others and is selected by default. Nothing is downloaded when the selection is unchanged and no newer release exists, and a failed install only disables that provider. See [Agent providers](#agent-providers). |
+| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi, `muse` is Muse Code). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` are installed from npm at their latest stable release; `muse` and `antigravity` are not on npm, so their vendor's installer runs once (Muse Code is a ~336 MB download) and the CLI updates itself afterwards. Pi is installed the same way as the npm ones and is selected by default. A working `muse` or `antigravity` CLI is never downloaded again; an npm provider is downloaded again only when a newer stable release is out. A failed install only disables that provider. See [Agent providers](#agent-providers). |
 | `env_vars` | list of `{name, value}`, `[]` | Environment variables exported to the daemon and therefore to every agent — e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`. **Only the names are logged, never the values.** |
 | `password` | string, empty | Password required for direct-port access. It is never asked for on the sidebar/ingress path. See [Relay vs. direct port](#remote-access-relay-vs-direct-port). |
 | `hostnames` | list of strings, `[]` | Extra DNS names the daemon accepts on the direct port (`PASEO_HOSTNAMES`), e.g. `paseo.example.com`, when you reach HA through a proxy or a custom name. |
@@ -176,7 +177,8 @@ The sidebar path never asks for the password: nginx authenticates to the daemon 
 
 ## Agent providers
 
-The `providers` option lists the same six providers Paseo supports:
+The `providers` option lists the same providers Paseo supports — its six built-in ones
+plus the two it ships as bundled plugins:
 
 | ID | Agent | Installed from |
 |---|---|---|
@@ -186,6 +188,8 @@ The `providers` option lists the same six providers Paseo supports:
 | `copilot` | GitHub Copilot CLI | npm `@github/copilot` (sign in with `copilot login` in a terminal, or set `COPILOT_GITHUB_TOKEN` in `env_vars`) |
 | `opencode` | OpenCode | npm `opencode-ai` |
 | `omp` | Oh My Pi | npm `@oh-my-pi/pi-coding-agent` plus the Bun runtime it needs (best effort, see [Known limitations](#known-limitations)) |
+| `muse` | Muse Code (Meta) | the vendor's installer, `https://dev.meta.ai/install.sh`, into `/data/agents/bin/muse` |
+| `antigravity` | Antigravity (Google) | the vendor's installer, `https://antigravity.google/cli/install.sh`, into `/data/agents/bin/antigravity` |
 
 On every start the add-on installs the selected providers, removes the deselected ones and
 sets each provider's enabled flag in Paseo. A provider is enabled only if it is selected
@@ -210,6 +214,14 @@ No agent CLI is part of the add-on image, and the add-on does not pin their vers
   `/data/agents/.paseo-ha-providers.failed` and not tried again; the next newer release is.
 - **Maintainer hold.** If a new agent release breaks with the Paseo version this add-on
   ships, an add-on update can hold that package at a known good version until it is fixed.
+- **Muse Code and Antigravity update themselves.** Neither is published to npm, so there is
+  no release to look up and nothing to roll back to. The add-on runs the vendor's installer
+  once, into a directory of its own under `/data/agents/bin`, and then leaves the CLI to
+  update itself. Each start only checks that the CLI still runs and records the version it
+  reports. Deselecting the provider deletes that whole directory (your login, kept under
+  `/data/home`, is untouched). The vendor installer also appends a PATH line to your shell
+  profile files under `/data/home`; the add-on sets `PATH` itself, so those lines are only a
+  leftover and can be ignored.
 - The start log has a `Providers: ...` line with each enabled provider's version.
 
 ## Logging in agents
@@ -219,7 +231,7 @@ installed it (until you remove it from `providers`). To authenticate:
 
 1. Open Paseo from the sidebar and start a terminal session.
 2. Run the agent's login flow, e.g. `pi` (then its auth command), `claude`, `codex login`,
-   `copilot login` or `opencode auth login`.
+   `copilot login`, `opencode auth login`, `muse` or `agy`.
 3. Or skip interactive login entirely by putting the provider key in `env_vars` (for
    example `ANTHROPIC_API_KEY`).
 
@@ -227,10 +239,12 @@ Credentials are stored under `/data/home` (`~/.claude`, `~/.codex`, `~/.pi/agent
 `~/.config`, `~/.local/...`), which is persistent, private to the add-on, and included in
 HA backups. They are never written to the editable `/config` folder.
 
-All agent CLIs come from the `providers` option: they are installed with npm into
-`/data/agents` and put first on `PATH`. Expect the first start after a change to take a
-while. Later starts only make a quick version check per provider and download nothing
-unless a newer release is out.
+All agent CLIs come from the `providers` option. The npm ones are installed with npm into
+`/data/agents/node_modules`, the vendor-installed ones into `/data/agents/bin/<provider>`,
+and both are put first on `PATH`. Expect the first start after a change to take a while:
+Muse Code alone is a ~336 MB download. On later starts each npm provider gets a quick
+check against the npm registry and is downloaded again only when a newer stable release is
+out; a vendor-installed CLI that still runs is never downloaded again.
 
 ## Git access
 
@@ -548,11 +562,11 @@ Open the add-on **Log** tab. The daemon's own output is there too.
 | `Port 6767 is mapped but no password is set; the daemon stays loopback-only` | Set `password` to enable direct access, or unmap the port. |
 | `A password is set but port 6767 is not mapped...` | Harmless: the password only applies to the direct port. Ingress never asks for it. |
 | `Local speech engine (sherpa-onnx-node) cannot load on this platform` | Dictation and voice mode were turned off and nothing was downloaded. Use `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars`. |
-| `Provider <id> could not be installed or does not run on <arch>` | That provider is disabled in Paseo and retried on the next start. Pi and the other providers still work. |
+| `Provider <id> could not be installed or does not run on <arch>` | That provider is disabled in Paseo and retried on the next start. Pi and the other providers still work. For `muse` and `antigravity` this can also mean the vendor's installer could not be downloaded. |
 | `Provider <id> is not installed and the npm registry could not be reached` | The add-on has no network access to npm. That provider stays disabled until a start that can reach `registry.npmjs.org`. |
 | `Could not check for a newer <id>; keeping the installed version` | Harmless: the registry was unreachable, so the installed version is used. |
 | `Provider <id> <package>@<version> could not be installed or does not run on <arch>; rolling back` | A new release is broken here. The previous version was restored and that release is skipped from now on. |
-| `Unknown provider '<name>' in providers option` | The value is ignored. Use one of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`. |
+| `Unknown provider '<name>' in providers option` | The value is ignored. Use one of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`. |
 | `Skill '<name>' ... has the same name as a Paseo built-in skill; skipped` | Rename your skill folder so Paseo's own skill sync cannot conflict. |
 | `Moved existing <dir> to <dir>.paseo-ha-backup-...` | A real tool folder was in the way of a `/config` link. Move your files into `/config` and delete the backup. |
 | `SUPERVISOR_TOKEN is not set` | The container is not running under the Supervisor (e.g. a plain `docker run`). API access is unavailable. |
@@ -605,6 +619,12 @@ session.
   agents, one workspace and one set of credentials.
 - **Local speech is unavailable on the Alpine (musl) images** where the prebuilt ONNX
   runtime cannot load; use `speech_provider: openai`.
+- **Muse Code and Antigravity get no Home Assistant setup from the add-on.** The bundled HA
+  skill, the agent instructions (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, …) and the
+  Home Assistant MCP server are written in each CLI's own configuration format, and the
+  add-on does not know those two. Agents on `muse` or `antigravity` therefore start without
+  the bundled HA guidance and without the HA MCP tools; they can still use the `ha` CLI and
+  the `SUPERVISOR_TOKEN` in the terminal. Wiring them needs its own change.
 - **Backups of `/data` are large** once speech models and agent CLIs are installed; a
   restore re-downloads nothing, but plan for the size.
 
