@@ -94,10 +94,21 @@ code="$(ccurl "${OTHER}" -o /dev/null -w '%{http_code}' -H "Authorization: Beare
 
 code="$(ccurl "${INGRESS}" -o /dev/null -w '%{http_code}' -H "X-Ingress-Path: ${INGRESS_PATH}" "http://${ADDON}:8099/api/health" || true)"
 [[ "${code}" == 200 ]] && pass "A) ingress /api/health without credentials -> 200" || fail "A) ingress -> ${code} (want 200)"
-code="$(docker exec "${INGRESS}" curl -s --http1.1 --max-time 5 -o /dev/null -w '%{http_code}' \
-  -H "X-Ingress-Path: ${INGRESS_PATH}" -H "Connection: Upgrade" -H "Upgrade: websocket" \
-  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  "http://${ADDON}:8099/ws" || true)"
+# Retried briefly, as in the smoke test: a just-started 0.11.x daemon answers
+# /api/health before its WebSocket listener binds, so the first upgrade after a
+# start can get a 503. Once this gets 101 the listener is up, which the
+# wrong-bearer check below also relies on.
+tries=0
+while :; do
+  code="$(docker exec "${INGRESS}" curl -s --http1.1 --max-time 5 -o /dev/null -w '%{http_code}' \
+    -H "X-Ingress-Path: ${INGRESS_PATH}" -H "Connection: Upgrade" -H "Upgrade: websocket" \
+    -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+    "http://${ADDON}:8099/ws" || true)"
+  if [[ "${code}" == 101 ]]; then break; fi
+  tries=$((tries + 1))
+  if (( tries >= 10 )); then break; fi
+  sleep 1
+done
 [[ "${code}" == 101 ]] && pass "A) ingress WebSocket upgrade -> 101 (bearer subprotocol injected)" || fail "A) ingress WS -> ${code} (want 101)"
 # The daemon authenticates WebSockets after the upgrade: a wrong bearer subprotocol
 # is closed with 4401 and logged, a right one is not. So: through ingress (nginx
