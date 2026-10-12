@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.11.2-1
+
+- Bundled Paseo **0.11.2** (was 0.11.1). It fixes text that was sometimes cut off in chats and Markdown previews on iOS. Nothing else changed in the add-on, and there is nothing to do after updating.
+- Bundled Paseo **0.11.2** and Pi **1.1.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.11.1-1
 
 - Bundled Paseo **0.11.1** (was 0.10.3). Two new agent providers come with it: **Muse Code** (`muse`, Meta) and **Antigravity** (`antigravity`, Google). Both appear in the `providers` option, and Paseo's own Usage screen, plugin registry and provider fixes come along with the upgrade. The ingress adapter needed no change: the anchors it rewrites are identical in 0.11.1.
