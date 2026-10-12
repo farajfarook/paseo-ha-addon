@@ -317,7 +317,7 @@ check "budget used up: warning names the deferral" test -n "$(last_start_log | g
 check "budget used up: daemon still healthy" in_app 'curl -fs http://127.0.0.1:6767/api/health'
 check "budget used up: deferred default not recorded" not_in_ledger paseo-test-g
 docker rm -f "${APP}" >/dev/null 2>&1
-PI_BUDGET= start_app
+PI_BUDGET='' start_app
 check "next start installs the deferred default" has_pkg paseo-test-g
 check "...and records it" in_ledger paseo-test-g
 
