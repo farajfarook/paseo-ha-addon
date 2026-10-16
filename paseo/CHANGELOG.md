@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.4-1
+
+- Bundled Paseo **0.11.4** (was 0.11.2). Paseo's Add provider catalog now has a search box, and Remove is no longer offered for plugin providers such as Muse Code and Antigravity. Add provider failures now show as a short message.
+- Paseo 0.11.3 also bundles Hoplite, a sponsored provider. The add-on does not offer it and never enables it, so nothing changes for you. There is nothing to do after updating.
+- Bundled Paseo **0.11.4** and Pi **1.3.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.11.2-1
 
 - Bundled Paseo **0.11.2** (was 0.11.1). It fixes text that was sometimes cut off in chats and Markdown previews on iOS. Nothing else changed in the add-on, and there is nothing to do after updating.
