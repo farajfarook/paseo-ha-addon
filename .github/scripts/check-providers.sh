@@ -12,6 +12,12 @@
 # Both are registered through the same agents.providers.<id>.enabled override, so
 # the add-on offers both kinds in one option.
 #
+# Excluded providers (EXCLUDED_PROVIDERS below) are left out on purpose and must not
+# be in the option. Each must be a plugin provider that Paseo only registers once
+# it is configured (`requiresConfiguration: true`): the add-on never writes its
+# agents.providers.<id> override or installs its CLI, so Paseo does not offer it.
+# The check fails if an excluded provider loses that flag.
+#
 # Usage: check-providers.sh <paseo-version> [config.yaml] [server-package-dir]
 #   With a server-package-dir (an extracted @getpaseo/server) nothing is downloaded.
 set -euo pipefail
@@ -20,6 +26,10 @@ ver="${1:-}"
 config="${2:-paseo/config.yaml}"
 pkg="${3:-}"
 [[ -n "${ver}" ]] || { echo "usage: $0 <paseo-version> [config.yaml] [server-package-dir]" >&2; exit 2; }
+
+# Providers the add-on deliberately does not offer (owner decision, see the
+# agent-providers spec): hoplite is a sponsored provider added in Paseo 0.11.3.
+EXCLUDED_PROVIDERS=(hoplite)
 
 if [[ -z "${pkg}" ]]; then
   work="$(mktemp -d)"; trap 'rm -rf "${work}"' EXIT
@@ -71,7 +81,26 @@ if [[ "${plugin_count}" -eq 0 ]]; then
   exit 1
 fi
 
-paseo_ids="$(printf '%s\n%s\n' "${builtin_ids}" "${plugin_ids}" | grep -v '^$' | sort -u)"
+# An excluded provider is only safe while Paseo leaves it unregistered without an
+# override, i.e. it is a plugin provider that requires configuration.
+excluded_ids="$(printf '%s\n' "${EXCLUDED_PROVIDERS[@]}" | sort -u)"
+excluded_found=""
+for id in ${excluded_ids}; do
+  if grep -qx "${id}" <<<"${builtin_ids}"; then
+    echo "ERROR: excluded provider '${id}' is a built-in provider of Paseo ${ver}; Paseo would offer it" >&2
+    exit 1
+  fi
+  grep -qx "${id}" <<<"${plugin_ids}" || continue
+  registration="$(grep -l "^ *id: \"${id}\",\$" "${plugin_dir}"/*-provider/server/provider.ts | head -n1)"
+  if ! grep -q 'requiresConfiguration: true' "${registration}"; then
+    echo "ERROR: excluded provider '${id}' no longer requires configuration in Paseo ${ver}" >&2
+    echo "(${registration#"${pkg}/"}); Paseo would offer it without an override." >&2
+    exit 1
+  fi
+  excluded_found+="${id} "
+done
+
+paseo_ids="$(printf '%s\n%s\n' "${builtin_ids}" "${plugin_ids}" | grep -v '^$' | grep -vxF -f <(printf '%s\n' "${EXCLUDED_PROVIDERS[@]}") | sort -u || true)"
 
 # Provider IDs in the add-on schema: list(a|b|c) under schema.providers.
 schema_ids="$(awk '/^schema:/{s=1;next} s&&/^[^ \t]/{s=0} s&&/^  providers:/{p=1;next} p&&/^    - list\(/{sub(/^    - list\(/,"");sub(/\)$/,"");gsub(/\|/,"\n");print;exit}' "${config}" | sort)"
@@ -79,6 +108,14 @@ schema_ids="$(awk '/^schema:/{s=1;next} s&&/^[^ \t]/{s=0} s&&/^  providers:/{p=1
 echo "Paseo ${ver} built-in providers:    $(paste -sd' ' <<<"${builtin_ids}")"
 echo "Paseo ${ver} plugin providers:      $(paste -sd' ' <<<"${plugin_ids}")"
 echo "add-on schema providers:            $(paste -sd' ' <<<"${schema_ids}")"
+excluded_found="${excluded_found% }"
+echo "excluded on purpose:                ${excluded_found:-none}"
+for id in ${excluded_ids}; do
+  if grep -qx "${id}" <<<"${schema_ids}"; then
+    echo "ERROR: excluded provider '${id}' is listed in the providers option of ${config}" >&2
+    exit 1
+  fi
+done
 if [[ -z "${paseo_ids}" || "${paseo_ids}" != "${schema_ids}" ]]; then
   echo "ERROR: the providers option in ${config} does not match Paseo ${ver}'s providers" >&2
   exit 1

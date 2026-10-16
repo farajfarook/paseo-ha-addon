@@ -82,6 +82,8 @@ expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp
 log_has "Providers: pi ${LATEST_PI}" && pass "summary line names pi ${LATEST_PI}" || fail "no summary line"
 docker exec "${C}" test -e /data/agents/bin && fail "a provider directory exists without a vendor provider selected" || pass "no vendor provider directory without a selection"
 log_has 'Installing provider (muse|antigravity)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
+# Hoplite is excluded on purpose: Paseo only registers it once its override exists.
+[[ "$(enabled hoplite)" == "null" ]] && pass "no hoplite override written" || fail "hoplite override written: enabled=$(enabled hoplite)"
 
 echo "== [codex]: codex installed; Pi uninstalled like any other provider"
 run_hook '["codex"]'

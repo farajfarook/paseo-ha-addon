@@ -178,7 +178,9 @@ The sidebar path never asks for the password: nginx authenticates to the daemon 
 ## Agent providers
 
 The `providers` option lists the same providers Paseo supports — its six built-in ones
-plus the two it ships as bundled plugins:
+plus the two it ships as bundled plugins. The one exception is Hoplite, a sponsored
+provider bundled with Paseo 0.11.3 and later: the add-on does not offer it, does not
+install its CLI and never enables it, so Paseo leaves it out.
 
 | ID | Agent | Installed from |
 |---|---|---|
