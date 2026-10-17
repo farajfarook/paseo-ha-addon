@@ -14,10 +14,12 @@ typo, keep PRs small, and follow `AGENTS.md`.
 ## Code changes
 
 1. Open an issue describing the problem or the provider you want added.
+   Security problems go through [`SECURITY.md`](SECURITY.md), not a public issue.
 2. Fork, branch from `main`.
 3. Read [`AGENTS.md`](AGENTS.md). It is the rulebook CodeRabbit reviews against:
-   - every change to `paseo/**`, `.github/**` or `repository.yaml` needs an
-     OpenSpec change under `openspec/changes/`, archived in the same PR;
+   - every change to `paseo/**`, `.github/workflows/**`, `.github/scripts/**`
+     or `repository.yaml` needs an OpenSpec change under `openspec/changes/`,
+     archived in the same PR (the exempt list is in AGENTS.md Rule 1);
    - bump `version` in `paseo/config.yaml` and add a `paseo/CHANGELOG.md` entry
      **only** when shipped files change (not for docs, tests or translations);
    - bash with `set -euo pipefail`, passes `shellcheck`.
