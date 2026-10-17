@@ -10,10 +10,10 @@
 sidebar or your phone, with a config check and git rollback built in.**
 
 [Paseo](https://paseo.sh) is a self-hosted daemon and web UI for coding agents. This
-add-on runs it on your Home Assistant box, opens it as a sidebar panel authenticated by
-Home Assistant, and starts the agents inside your Home Assistant configuration with live
-API access. Ask for an automation; the agent edits the YAML, runs a config check, reloads
-the domain and verifies the result against real entity states.
+add-on runs it on your Home Assistant box. It opens as a sidebar panel, and Home Assistant
+handles the login. Agents start inside your Home Assistant configuration with live API
+access. Ask for an automation. The agent edits the YAML, runs a config check, reloads the
+domain and verifies the result against real entity states.
 
 <!-- TODO(screenshots): hero GIF goes here once recorded.
 <p align="center"><img src="paseo/images/demo.gif" width="900" alt="Paseo in the Home Assistant sidebar: an agent edits automations.yaml, runs a config check and reloads"></p>
@@ -76,16 +76,18 @@ proved people want this. This add-on is the next step:
 Agents run as root in the container with read-write access to your live configuration
 and a Home Assistant token with Supervisor `manager` rights. Anyone who can open the panel
 can drive them. That is what makes the add-on useful and what makes it dangerous, so the
-bundled guidance forbids touching `secrets.yaml`, `.storage/` or other add-ons without
-asking, requires a config check before every reload, and `git_snapshot` gives you a
-revert. Read [Security and trust model](paseo/DOCS.md#security-and-trust-model) before
+bundled guidance never exposes values from `secrets.yaml`, forbids editing `.storage/` while
+Core runs, requires your approval before changing other add-ons or restarting Core, and
+requires a config check before every reload. `git_snapshot` gives you a revert. Read [Security and trust model](paseo/DOCS.md#security-and-trust-model) before
 you enable it, keep a backup, and give the panel only to people you trust with your home.
 
 ## FAQ
 
 **Does my configuration leave my network?** Only what the agent you chose sends to its own
-vendor (Anthropic, OpenAI, GitHub, Google, Meta, or your Pi model provider). Paseo itself is
-self-hosted and has no telemetry. The optional relay is end-to-end encrypted.
+vendor (Anthropic, OpenAI, GitHub, Google, Meta, or your Pi model provider). If you turn on
+dictation or voice mode with `speech_provider: openai`, speech and spoken replies go to
+OpenAI as well. Paseo itself is self-hosted and has no telemetry. The optional relay is
+end-to-end encrypted.
 
 **What does it cost?** Nothing for the add-on. Agents use your existing subscription
 (Claude Pro/Max, ChatGPT Plus/Pro, Copilot, Google, Meta) or API key.
