@@ -1,0 +1,21 @@
+name: Feature or provider request
+description: Ask for a new agent provider, option or behaviour.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like the add-on to do?
+    validations:
+      required: true
+  - type: input
+    id: upstream
+    attributes:
+      label: If this is a provider, does Paseo already support it?
+      placeholder: link to Paseo docs / issue

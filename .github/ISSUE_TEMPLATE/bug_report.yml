@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the add-on does not work.
+labels: [bug]
+body:
+  - type: input
+    id: addon_version
+    attributes:
+      label: Add-on version
+      placeholder: e.g. 0.11.4-1 (Settings → Add-ons → Paseo)
+    validations:
+      required: true
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Core / OS version and architecture
+      placeholder: e.g. Core 2026.10.2, HAOS 17.1, aarch64 (Raspberry Pi 5)
+    validations:
+      required: true
+  - type: dropdown
+    id: providers
+    attributes:
+      label: Providers selected
+      multiple: true
+      options: [pi, claude, codex, copilot, opencode, omp, muse, antigravity]
+  - type: dropdown
+    id: access
+    attributes:
+      label: How were you connected?
+      options: [Sidebar (ingress), Paseo mobile/desktop app via relay, Direct port 6767, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Add-on log
+      description: Paste the relevant part of the add-on **Log** tab. Remove tokens and secrets.
+      render: text
+    validations:
+      required: true

@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or help
+    url: https://github.com/farajfarook/paseo-ha-addon/discussions/categories/q-a
+    about: Ask how to set something up or why something behaves as it does.
+  - name: Paseo itself (UI, daemon, apps, relay)
+    url: https://github.com/getpaseo/paseo/issues
+    about: Problems inside Paseo that also happen outside Home Assistant belong upstream.
+  - name: Security vulnerability
+    url: https://github.com/farajfarook/paseo-ha-addon/security/advisories/new
+    about: Report privately, not as an issue.
