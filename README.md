@@ -15,9 +15,12 @@ handles the login. Agents start inside your Home Assistant configuration with li
 access. Ask for an automation. The agent edits the YAML, runs a config check, reloads the
 domain and verifies the result against real entity states.
 
-<!-- TODO(screenshots): hero GIF goes here once recorded.
-<p align="center"><img src="paseo/images/demo.gif" width="900" alt="Paseo in the Home Assistant sidebar: an agent edits automations.yaml, runs a config check and reloads"></p>
--->
+<p align="center">
+  <img src="docs/demo.gif" width="900" alt="Paseo in the Home Assistant sidebar: an agent adds an automation, runs a config check, reloads, verifies and commits; then the same session on a phone">
+</p>
+<p align="center">
+  <a href="https://youtu.be/jiKUqDyML24">&#9654; Watch the 80-second demo on YouTube</a>
+</p>
 
 ## Why this add-on
 
