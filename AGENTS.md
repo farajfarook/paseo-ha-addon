@@ -38,7 +38,7 @@ The project is spec-driven (`openspec/config.yaml`: `schema: spec-driven`).
 **Exempt files** (no OpenSpec change needed): anything under `openspec/`,
 `AGENTS.md`, `.coderabbit.yaml`, `.github/CODEOWNERS`, `LICENSE`, `.gitignore`,
 `.gitattributes`, the root `README.md`, `CONTRIBUTING.md`, `SECURITY.md`,
-`.github/ISSUE_TEMPLATE/**`, and `.pi/`.
+`.github/ISSUE_TEMPLATE/**`, `docs/**` (README media), and `.pi/`.
 
 **Every other changed file is code**, including `paseo/**` (and its DOCS.md),
 `.github/workflows/**`, `.github/scripts/**` and `repository.yaml`. A PR that
