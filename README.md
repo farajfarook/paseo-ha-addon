@@ -1,37 +1,130 @@
 # Paseo Home Assistant Add-on
 
-Run [Paseo](https://paseo.sh) — a self-hosted daemon and web UI for coding agents
-(Pi, Claude, Codex, Copilot, OpenCode, Oh My Pi) — directly on your Home Assistant box, opened
-from the HA sidebar and authenticated by Home Assistant. Agents start inside your
-Home Assistant configuration with live API access, bundled guidance and optional
-git snapshots, so configuring Home Assistant with agents is easy and safe.
+[![Add repository to my Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Ffarajfarook%2Fpaseo-ha-addon)
+[![Release](https://img.shields.io/github/v/release/farajfarook/paseo-ha-addon?label=release)](https://github.com/farajfarook/paseo-ha-addon/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![amd64](https://img.shields.io/badge/amd64-yes-green.svg)
+![aarch64](https://img.shields.io/badge/aarch64-yes-green.svg)
+
+**Run Claude Code, Codex, Copilot, OpenCode, Pi and more inside Home Assistant, from the
+sidebar or your phone, with a config check and git rollback built in.**
+
+[Paseo](https://paseo.sh) is a self-hosted daemon and web UI for coding agents. This
+add-on runs it on your Home Assistant box. It opens as a sidebar panel, and Home Assistant
+handles the login. Agents start inside your Home Assistant configuration with live API
+access. Ask for an automation. The agent edits the YAML, runs a config check, reloads the
+domain and verifies the result against real entity states.
+
+<!-- TODO(screenshots): hero GIF goes here once recorded.
+<p align="center"><img src="paseo/images/demo.gif" width="900" alt="Paseo in the Home Assistant sidebar: an agent edits automations.yaml, runs a config check and reloads"></p>
+-->
+
+## Why this add-on
+
+- **Eight agents, your subscription.** Claude Code, Codex, GitHub Copilot, OpenCode, Pi
+  (default), Oh My Pi, Muse Code (Meta) and Antigravity (Google). Pick any mix in one
+  option and sign in with the plan or API key you already have.
+- **A real UI, not a terminal in an iframe.** Chat, diffs, file explorer, terminals,
+  permission prompts and optional voice, from Paseo's web UI. Works on a phone, and the
+  Paseo iOS/Android/desktop apps connect through Paseo's encrypted relay or a direct port.
+- **Always current.** Every selected agent CLI is installed at its latest stable release on
+  each start, with automatic rollback if a new release does not run. No waiting for an
+  add-on update to get a new Claude or Codex.
+- **Knows Home Assistant.** Agents get the Core REST and WebSocket APIs, the `ha` CLI, the
+  Home Assistant MCP server (auto-wired when enabled) and a bundled HA skill that enforces
+  edit → `check_config` → reload → verify.
+- **Undo button.** Optional git snapshots of `/homeassistant` so every agent change is a
+  commit you can review or revert.
+- **Sees your whole box.** `/homeassistant`, every add-on's config (Node-RED, ESPHome, …),
+  `/share`, `/media`, `/backup`, plus `git`, `gh` and SSH keys for your dotfiles repo.
+- **No second login.** Ingress uses your Home Assistant session. No ports, tokens or pairing
+  unless you want remote access.
 
 ## Installation
 
-[![Open your Home Assistant instance and show the add add-on repository dialog with this repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Ffarajfarook%2Fpaseo-ha-addon)
+1. Click the **Add repository** badge above, or in Home Assistant go to
+   **Settings → Add-ons → Add-on Store → ⋮ → Repositories** and add
+   `https://github.com/farajfarook/paseo-ha-addon`.
+2. Install **Paseo**, choose your `providers`, start it and enable **Show in sidebar**.
+3. Open **Paseo** from the sidebar, start a terminal and run the agent's login
+   (`claude`, `codex login`, `copilot login`, …) or put an API key in `env_vars`.
 
-Or add the repository manually:
+Requirements: Home Assistant OS or Supervised, 64-bit (`amd64` or `aarch64`, e.g.
+Raspberry Pi 4/5), internet access on first start, and an account or API key for the
+agents you select. The add-on itself is free.
 
-1. In Home Assistant go to **Settings → Add-ons → Add-on Store**.
-2. Open the **⋮** menu → **Repositories** and add:
+Full setup, every option and the troubleshooting guide are in
+[`paseo/DOCS.md`](paseo/DOCS.md).
 
-   ```
-   https://github.com/farajfarook/paseo-ha-addon
-   ```
+## How it compares with the Claude Code terminal add-ons
 
-3. Install **Paseo**, start it and enable **Show in sidebar**.
+Several community add-ons put Claude Code in a web terminal inside Home Assistant. They
+proved people want this. This add-on is the next step:
 
-See [`paseo/DOCS.md`](paseo/DOCS.md) for configuration and the security model.
+| | Terminal add-ons | Paseo add-on |
+|---|---|---|
+| Agents | Claude Code only | 8, selectable, mixed |
+| Interface | `ttyd` terminal in an iframe | Paseo web UI: chat, diffs, files, terminals, voice |
+| Mobile | terminal in a phone browser | Paseo mobile apps via relay, or the web UI |
+| Agent version | baked into the image | latest stable on every start, auto-rollback |
+| HA awareness | manual | HA APIs, `ha` CLI, HA MCP server, bundled skill |
+| Safety net | none | config check before reload, optional git snapshots |
+| Other add-on configs | usually not mounted | `/addon_configs` read-write |
 
-## Add-ons
+## Security, in one paragraph
 
-| Add-on | Description |
-|---|---|
-| [Paseo](paseo/) | Paseo daemon + web UI with Pi (default), Claude, Codex, Copilot, OpenCode and Oh My Pi selectable in one `providers` option, each installed at its latest stable release on start |
+Agents run as root in the container with read-write access to your live configuration
+and a Home Assistant token with Supervisor `manager` rights. Anyone who can open the panel
+can drive them. That is what makes the add-on useful and what makes it dangerous, so the
+bundled guidance never exposes values from `secrets.yaml`, forbids editing `.storage/` while
+Core runs, requires your approval before changing other add-ons or restarting Core, and
+requires a config check before every reload. `git_snapshot` gives you a revert. Read [Security and trust model](paseo/DOCS.md#security-and-trust-model) before
+you enable it, keep a backup, and give the panel only to people you trust with your home.
+
+## FAQ
+
+**Does my configuration leave my network?** Only what the agent you chose sends to its own
+vendor (Anthropic, OpenAI, GitHub, Google, Meta, or your Pi model provider). If you turn on
+dictation or voice mode with `speech_provider: openai`, speech and spoken replies go to
+OpenAI as well. Paseo itself is self-hosted and has no telemetry. The optional relay is
+end-to-end encrypted.
+
+**What does it cost?** Nothing for the add-on. Agents use your existing subscription
+(Claude Pro/Max, ChatGPT Plus/Pro, Copilot, Google, Meta) or API key.
+
+**Which agent should I start with?** Pi is on by default and works with any model provider
+via API key. Claude Code and Codex are the most popular for Home Assistant YAML.
+
+**Can I use it from my phone?** Yes: the sidebar panel works in the HA companion app, and
+Paseo's mobile apps pair over the relay (no port forwarding) or a password-protected direct
+port.
+
+**Does it support Raspberry Pi?** 64-bit Home Assistant OS on a Pi 4 or 5, yes. 32-bit
+(`armv7`) is not supported, in line with Home Assistant OS 17.
+
+## Versioning
+
+Versions are `<paseo>-<rev>`: the bundled Paseo release plus an add-on revision. See
+[`paseo/CHANGELOG.md`](paseo/CHANGELOG.md) and the
+[GitHub releases](https://github.com/farajfarook/paseo-ha-addon/releases).
+
+## Contributing and support
+
+- Bugs and feature requests: [Issues](https://github.com/farajfarook/paseo-ha-addon/issues).
+- Questions and show-and-tell: [Discussions](https://github.com/farajfarook/paseo-ha-addon/discussions).
+- Paseo itself: [getpaseo/paseo](https://github.com/getpaseo/paseo).
+
+If this saved you an evening, a star helps other Home Assistant users find it.
 
 ## License
 
-Apache-2.0, matching upstream Paseo. See [LICENSE](LICENSE).
+Apache-2.0, matching upstream Paseo. See [LICENSE](LICENSE). Paseo is © the Paseo
+authors; this add-on is not affiliated with or endorsed by the Paseo project.
+
+---
+
+<details>
+<summary><strong>Maintainer notes: releasing and bumping Paseo</strong></summary>
 
 ## Releasing
 
@@ -143,3 +236,5 @@ Baseline for the pinned release: `paseo-anchors.sh --diff 0.10.2 0.10.3` and
 `--diff 0.10.3 0.11.0-beta.3` both report no anchor change, and `web-ui.ts` /
 `daemon-endpoints.ts` are byte-identical between `v0.10.2`, `v0.10.3` and
 `v0.11.0-beta.3`.
+
+</details>
