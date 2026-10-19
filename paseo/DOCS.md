@@ -40,16 +40,21 @@ vendor's own installer, and enables each in Paseo. The first start needs interne
 
 ## Installation
 
-1. **Settings → Add-ons → Add-on Store**, then the **⋮** menu → **Repositories** and add:
-   `https://github.com/farajfarook/paseo-ha-addon`
-2. Pick **Paseo** from the `paseo-ha-addon` repository and press **Install**. The
+Home Assistant renamed add-ons to **apps** in 2026.2. Same thing, new name; this
+documentation still says add-on in places. The repository keeps its name because the
+Supervisor derives the app id (`b498db88_paseo`) from the repository URL.
+
+1. **Settings → Apps → Install app**, then the **⋮** menu (top right) → **Repositories**
+   and add: `https://github.com/farajfarook/paseo-ha-addon`. Or use the **Show app**
+   badge in the repository README, which does both steps in one click.
+2. Pick **Paseo** from the **Paseo Home Assistant Add-ons** section and press **Install**. The
    pre-built image for your architecture is pulled from GHCR; nothing is built on the
    device.
 3. Open **Show in sidebar** and **Start**. Options can be left at their defaults.
 4. The **Paseo** entry appears in the HA side menu once the daemon is healthy — usually
    well under a minute on amd64/aarch64.
 
-Updating works like any other add-on: **Update** in the Add-on Store. `/data` (Paseo
+Updating works like any other app: **Update** on the app's page under **Settings → Apps**. `/data` (Paseo
 state, agent logins, installed agents) survives updates and is included in HA backups.
 
 Uninstalling deletes `/data`, but the daemon's server ID normally comes back the same on
@@ -80,7 +85,7 @@ environment the agents get, which is where you log agents in and run `ha` yourse
 
 ## Options reference
 
-Set these under **Configuration** in the Add-on Store. All of them take effect on the next
+Set these under **Configuration** on the app's page (**Settings → Apps → Paseo**). All of them take effect on the next
 add-on start.
 
 | Option | Type / default | Effect |
