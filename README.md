@@ -51,8 +51,8 @@ keeps "add-on" in its name because the Supervisor derives the app id from the re
 URL, so the URL has to stay put for existing installs.
 
 1. Click the **Show app** badge above. It adds this repository to your Home Assistant if
-   needed and opens the Paseo app page (works on Home Assistant 2026.2.x or newer). Or do
-   it by hand: go to
+   needed and opens the Paseo app page (Home Assistant 2026.3 or newer; on 2026.2 add the
+   repository by hand first). Or do it by hand: go to
    **Settings > Apps > Install app**, open the **⋮** menu in the top right, pick
    **Repositories**, add `https://github.com/farajfarook/paseo-ha-addon` and close the
    dialog. Paseo then appears in the store under "Paseo Home Assistant Add-ons".
