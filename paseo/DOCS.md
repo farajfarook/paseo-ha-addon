@@ -47,7 +47,7 @@ Supervisor derives the app id (`b498db88_paseo`) from the repository URL.
 1. **Settings → Apps → Install app**, then the **⋮** menu (top right) → **Repositories**
    and add: `https://github.com/farajfarook/paseo-ha-addon`. Or use the **Show app**
    badge in the repository README, which does both steps in one click.
-2. Pick **Paseo** from the **Paseo Home Assistant Add-ons** section and press **Install**. The
+2. Pick **Paseo** from the **Paseo for Home Assistant** section and press **Install**. The
    pre-built image for your architecture is pulled from GHCR; nothing is built on the
    device.
 3. Open **Show in sidebar** and **Start**. Options can be left at their defaults.
