@@ -55,7 +55,7 @@ URL, so the URL has to stay put for existing installs.
    repository by hand first). Or do it by hand: go to
    **Settings > Apps > Install app**, open the **⋮** menu in the top right, pick
    **Repositories**, add `https://github.com/farajfarook/paseo-ha-addon` and close the
-   dialog. Paseo then appears in the store under "Paseo for Home Assistant" (once #27 is merged; "Paseo Home Assistant Add-ons" before that).
+   dialog. Paseo then appears in the store under "Paseo for Home Assistant".
 2. Install **Paseo**, choose your `providers`, start it and enable **Show in sidebar**.
 3. Open **Paseo** from the sidebar, start a terminal and run the agent's login
    (`claude`, `codex login`, `copilot login`, …) or put an API key in `env_vars`.
