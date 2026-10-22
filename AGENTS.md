@@ -55,6 +55,19 @@ changes code must:
    changes, in OpenSpec format: `## ADDED|MODIFIED|REMOVED Requirements`, and
    each requirement has at least one `#### Scenario`.
 
+   **Pin-only bumps are not a behaviour change.** "Behaviour" here means the
+   add-on's own behaviour as specified in `openspec/specs/`. A PR that only
+   raises the pins of bundled upstream software (`PASEO_VERSION`,
+   `HA_CLI_VERSION`, `GH_CLI_VERSION`, or the Pi version named in the
+   changelog), the add-on `version` and the CHANGELOG, and changes nothing else
+   under `paseo/rootfs/**`, needs no spec deltas. New features or fixes that
+   come with the upstream release belong to that upstream project, not to the
+   add-on's specs. Its OpenSpec change sets `skip_specs: true` in
+   `.openspec.yaml` and says in `proposal.md` that the add-on's specified
+   behaviour is unchanged (ingress anchors and provider list checked). If the
+   bump also needs an add-on change (for example a new provider or an ingress
+   adapter fix), it is not pin-only and needs spec deltas as above.
+
 ## Rule 2: the change is archived in the same PR
 
 Before merging, archive the implemented change with `/opsx-archive`:
