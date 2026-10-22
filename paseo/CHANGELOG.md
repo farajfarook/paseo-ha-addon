@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0-1
+
+- Bundled Paseo **0.12.0** (was 0.11.4). New in Paseo: background workspaces (hidden from the sidebar unless Show background is on), a Send feedback button in the diff pane, a fullscreen composer on phones, and `paseo usage` to show account quotas from the CLI. It also fixes Paseo slowly growing to about 1 GB of memory and running out of memory during long OpenCode replies.
+- The bundled Home Assistant CLI is now 5.6.0 (was 5.5.0) and the GitHub CLI 2.103.0 (was 2.102.0). The ingress adapter needed no change, and there is nothing to do after updating.
+- Bundled Paseo **0.12.0** and Pi **1.3.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.11.4-1
 
 - Bundled Paseo **0.11.4** (was 0.11.2). Paseo's Add provider catalog now has a search box, and Remove is no longer offered for plugin providers such as Muse Code and Antigravity. Add provider failures now show as a short message.
