@@ -13,8 +13,8 @@ The Paseo 0.13.0 bump moves an ingress anchor count (a new lazy chunk path in th
 
 - `paseo/tests/ingress/run.sh` becomes executable (git mode 755), like the other suites.
 - Put `${PLAYWRIGHT_DIR}/node_modules` on `NODE_PATH` (native path and `;` separator on Windows), so playwright-core is found where the usage text says.
-- `findExecutable()`: honour a new `INGRESS_BROWSER` override, keep the Windows candidates, then try `/usr/bin/google-chrome`, `chromium`, `chromium-browser`, `microsoft-edge`, Playwright's downloaded Chromium (`~/.cache/ms-playwright/chromium-<rev>/chrome-linux64/chrome` or `chrome-linux/chrome`, newest first) and `/usr/bin/brave-browser`. Log the browser it uses.
-- Navigation check: click the sidebar's `Settings` button (`aria-label="Settings"`) when present and require that the path changed and stayed under the ingress prefix; the deep-link reload check then reloads that page as before. Without a Settings button the old generic selectors are used, as before.
+- Browser selection: honour a new `INGRESS_BROWSER` override, keep the Windows candidates, then try `/usr/bin/google-chrome`, `chromium`, `chromium-browser` and `microsoft-edge`. Without a system browser, let Playwright launch the browser it installed (`npx playwright install chromium`, full or `--only-shell`; no hard-coded Playwright paths), and only then `/usr/bin/brave-browser`. Log the browser it uses, and fail with a hint when none is found.
+- Navigation check: click the sidebar's `Settings` button (`aria-label="Settings"`) when present and require that the path changed and stayed under the ingress prefix; the deep-link reload check then reloads that page as before. Without a Settings button the old generic selectors are used. If neither finds a target, the suite now records a failed check instead of skipping navigation and the deep-link reload.
 
 Test-only. No shipped file changes, so no version bump of its own.
 

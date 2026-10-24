@@ -17,8 +17,9 @@
 # Env:   INGRESS_KEEP=1   keep containers for debugging
 #        INGRESS_TIMEOUT  seconds to wait for health (default 180)
 #        PLAYWRIGHT_DIR   directory with playwright-core installed (default ../browsertest)
-#        INGRESS_BROWSER  Chromium-family browser executable (default: first
-#                         Edge/Chrome/Chromium/Brave or Playwright Chromium found)
+#        INGRESS_BROWSER  Chromium-family browser executable (default: a system
+#                         Edge/Chrome/Chromium, else Playwright's installed
+#                         Chromium, else Brave)
 # ==============================================================================
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
@@ -114,15 +115,6 @@ const errors = [];
 
 function findExecutable() {
   const fs = require("fs");
-  // Playwright's own Chromium downloads (~/.cache/ms-playwright/chromium-<rev>), newest first.
-  const pwRoot = path.join(os.homedir(), ".cache/ms-playwright");
-  let pwChromium = [];
-  try {
-    pwChromium = fs.readdirSync(pwRoot)
-      .filter((d) => /^chromium-\d+$/.test(d))
-      .sort((a, b) => Number(b.split("-")[1]) - Number(a.split("-")[1]))
-      .flatMap((d) => [path.join(pwRoot, d, "chrome-linux64/chrome"), path.join(pwRoot, d, "chrome-linux/chrome")]);
-  } catch { /* no Playwright browsers installed */ }
   const candidates = [
     process.env.INGRESS_BROWSER,
     "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
@@ -133,18 +125,35 @@ function findExecutable() {
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
     "/usr/bin/microsoft-edge",
-    ...pwChromium,
-    "/usr/bin/brave-browser",
   ];
   for (const c of candidates) if (c && fs.existsSync(c)) return c;
   return null;
 }
 
-(async () => {
+async function launchBrowser() {
   const exe = findExecutable();
-  if (!exe) throw new Error("no Chromium-family browser found (set INGRESS_BROWSER)");
-  console.log(`[browser] using ${exe}`);
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  if (exe) {
+    console.log(`[browser] using ${exe}`);
+    return chromium.launch({ executablePath: exe, headless: true });
+  }
+  // No system Chrome/Chromium/Edge: let Playwright pick the browser it installed
+  // (`npx playwright install chromium`, full or --only-shell), then try Brave.
+  try {
+    const b = await chromium.launch({ headless: true });
+    console.log(`[browser] using Playwright's installed Chromium ${b.version()}`);
+    return b;
+  } catch (e) {
+    const brave = "/usr/bin/brave-browser";
+    if (!require("fs").existsSync(brave)) {
+      throw new Error(`no Chromium-family browser found; set INGRESS_BROWSER or run "npx playwright install chromium" (${String(e.message).split("\n")[0]})`);
+    }
+    console.log(`[browser] using ${brave}`);
+    return chromium.launch({ executablePath: brave, headless: true });
+  }
+}
+
+(async () => {
+  const browser = await launchBrowser();
   const page = await browser.newPage();
 
   page.on("requestfailed", (r) => {
@@ -210,7 +219,7 @@ function findExecutable() {
       `deep-link reload returns to the same page (${afterReload.path}, body chars=${afterReload.body})`,
     ]);
   } else {
-    console.log("[browser] WARN: no nav elements found; navigation/reload checks skipped");
+    results.push([false, "navigation target found (no Settings button or nav item; navigation and deep-link reload not checked)"]);
   }
 
   // 6) Stale host heal (heal-stale-host-after-reinstall).
