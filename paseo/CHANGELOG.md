@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0-1
+
+- Bundled Paseo **0.13.0** (was 0.12.0). New in Paseo: connected hosts, so agents can create, prompt and monitor agents on other machines; an All changes view in the Changes pane that shows committed and uncommitted work in one diff; and pasting images or dropping files into terminals. It also fixes agents showing as running after a daemon restart and large Claude sessions showing an empty chat or crashing the daemon.
+- The bundled GitHub CLI is now 2.103.2 (was 2.103.0). The ingress adapter needed no change, and there is nothing to do after updating.
+- Bundled Paseo **0.13.0** and Pi **1.4.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.12.0-1
 
 - Bundled Paseo **0.12.0** (was 0.11.4). New in Paseo: background workspaces (hidden from the sidebar unless Show background is on), a Send feedback button in the diff pane, a fullscreen composer on phones, and `paseo usage` to show account quotas from the CLI. It also fixes Paseo slowly growing to about 1 GB of memory and running out of memory during long OpenCode replies.
