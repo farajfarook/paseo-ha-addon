@@ -39,11 +39,18 @@ count() { # count <label> <pattern> <file>
 }
 
 report() { # report <server-package-dir> <protocol-package-dir>
-  local s="$1" p="$2" bundle endpoints
-  bundle="$(ls "$s"/dist/server/web-ui/_expo/static/js/web/index-*.js 2>/dev/null | head -n 1 || true)"
+  local s="$1" p="$2" entry bundle endpoints
+  # The bundle is the entry script index.html loads. Other index-<hash>.js files can
+  # sit next to it (since 0.13.0 a lazy barcode-detector chunk does), so never glob.
+  entry="$(grep -o -E '/_expo/static/js/web/index-[0-9a-f]+\.js' "${s}/dist/server/web-ui/index.html" 2>/dev/null | head -n 1 || true)"
+  bundle="${entry:+${s}/dist/server/web-ui${entry}}"
   endpoints="${p}/dist/daemon-endpoints.js"
-  if [[ -z "${bundle}" || ! -f "${endpoints}" ]]; then
-    echo "error: unexpected package layout (no web UI bundle or ${endpoints})" >&2
+  if [[ -z "${bundle}" || ! -f "${bundle}" ]]; then
+    echo "error: unexpected package layout (no web UI entry bundle referenced by ${s}/dist/server/web-ui/index.html)" >&2
+    return 1
+  fi
+  if [[ ! -f "${endpoints}" ]]; then
+    echo "error: unexpected package layout (no ${endpoints})" >&2
     return 1
   fi
 

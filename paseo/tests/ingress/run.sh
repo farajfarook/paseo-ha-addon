@@ -16,7 +16,10 @@
 # Usage: run.sh <image> [port]
 # Env:   INGRESS_KEEP=1   keep containers for debugging
 #        INGRESS_TIMEOUT  seconds to wait for health (default 180)
-#        PLAYWRIGHT_DIR   directory with playwright-core installed
+#        PLAYWRIGHT_DIR   directory with playwright-core installed (default ../browsertest)
+#        INGRESS_BROWSER  Chromium-family browser executable (default: a system
+#                         Edge/Chrome/Chromium, else Playwright's installed
+#                         Chromium, else Brave)
 # ==============================================================================
 set -euo pipefail
 export MSYS_NO_PATHCONV=1
@@ -38,6 +41,14 @@ WORK="$(mktemp -d)"
 HOST_WORK="${WORK}"
 command -v cygpath >/dev/null 2>&1 && HOST_WORK="$(cygpath -m "${WORK}")"
 PWDIR="${PLAYWRIGHT_DIR:-$(pwd)/../browsertest}"
+# Let node resolve playwright-core from PLAYWRIGHT_DIR (Windows node wants a native
+# path and ';' as the NODE_PATH separator).
+if command -v cygpath >/dev/null 2>&1; then
+  NODE_PATH="$(cygpath -m "${PWDIR}")/node_modules${NODE_PATH:+;${NODE_PATH}}"
+else
+  NODE_PATH="${PWDIR}/node_modules${NODE_PATH:+:${NODE_PATH}}"
+fi
+export NODE_PATH
 
 log()  { echo "[ingress] $*"; }
 pass() { echo "[ingress] PASS: $*"; }
@@ -103,20 +114,46 @@ const escapes = [];
 const errors = [];
 
 function findExecutable() {
+  const fs = require("fs");
   const candidates = [
+    process.env.INGRESS_BROWSER,
     "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
     "C:/Program Files/Google/Chrome/Application/chrome.exe",
     "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
     path.join(os.homedir(), "AppData/Local/Google/Chrome/Application/chrome.exe"),
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/microsoft-edge",
   ];
-  for (const c of candidates) if (require("fs").existsSync(c)) return c;
+  for (const c of candidates) if (c && fs.existsSync(c)) return c;
   return null;
 }
 
-(async () => {
+async function launchBrowser() {
   const exe = findExecutable();
-  if (!exe) throw new Error("no Edge/Chrome executable found");
-  const browser = await chromium.launch({ executablePath: exe, headless: true });
+  if (exe) {
+    console.log(`[browser] using ${exe}`);
+    return chromium.launch({ executablePath: exe, headless: true });
+  }
+  // No system Chrome/Chromium/Edge: let Playwright pick the browser it installed
+  // (`npx playwright install chromium`, full or --only-shell), then try Brave.
+  try {
+    const b = await chromium.launch({ headless: true });
+    console.log(`[browser] using Playwright's installed Chromium ${b.version()}`);
+    return b;
+  } catch (e) {
+    const brave = "/usr/bin/brave-browser";
+    if (!require("fs").existsSync(brave)) {
+      throw new Error(`no Chromium-family browser found; set INGRESS_BROWSER or run "npx playwright install chromium" (${String(e.message).split("\n")[0]})`);
+    }
+    console.log(`[browser] using ${brave}`);
+    return chromium.launch({ executablePath: brave, headless: true });
+  }
+}
+
+(async () => {
+  const browser = await launchBrowser();
   const page = await browser.newPage();
 
   page.on("requestfailed", (r) => {
@@ -157,13 +194,18 @@ function findExecutable() {
   }, PREFIX).catch((e) => `ERR:${e.message}`);
   results.push([resp === 200, `fetch('/api/health') from the page -> ${resp}`]);
 
-  // 3) In-app navigation: click a sidebar/nav item if the UI exposes one.
-  const nav = await page.$$("nav a, nav button, [role=tablist] [role=tab], aside button");
-  if (nav.length > 1) {
-    await nav[1].click().catch(() => {});
+  // 3) In-app navigation: open Settings from the sidebar (an aria-labelled button since
+  //    Paseo 0.12/0.13), else click a generic sidebar/nav item if the UI exposes one.
+  const settings = await page.$('[aria-label="Settings"]');
+  const nav = settings ? [settings] : (await page.$$("nav a, nav button, [role=tablist] [role=tab], aside button")).slice(1);
+  if (nav.length > 0) {
+    await nav[0].click().catch(() => {});
     await page.waitForTimeout(2000);
     const afterNav = await page.evaluate(() => window.location.pathname);
-    results.push([afterNav.startsWith(PREFIX), `navigation stays under the prefix (${afterNav})`]);
+    results.push([
+      afterNav.startsWith(PREFIX) && (!settings || afterNav !== boot.path),
+      `navigation stays under the prefix (${boot.path} -> ${afterNav})`,
+    ]);
     // 4) Deep-link reload.
     await page.reload({ waitUntil: "networkidle", timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(4000);
@@ -177,7 +219,7 @@ function findExecutable() {
       `deep-link reload returns to the same page (${afterReload.path}, body chars=${afterReload.body})`,
     ]);
   } else {
-    console.log("[browser] WARN: no nav elements found; navigation/reload checks skipped");
+    results.push([false, "navigation target found (no Settings button or nav item; navigation and deep-link reload not checked)"]);
   }
 
   // 6) Stale host heal (heal-stale-host-after-reinstall).
