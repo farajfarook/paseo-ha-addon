@@ -41,7 +41,16 @@ fi
 # Provider IDs shipped by Paseo: the `id:` of every AGENT_PROVIDER_DEFINITIONS entry.
 # The definitions live in the web UI bundle (shared with the server); take the array
 # between AGENT_PROVIDER_DEFINITIONS' `l=[` and the dev-only `d=[` list.
-bundle="$(ls "${pkg}"/dist/server/web-ui/_expo/static/js/web/index-*.js | head -n1)"
+# The bundle is the entry script index.html loads. Other index-<hash>.js files can
+# sit next to it (since 0.13.0 a lazy barcode-detector chunk does), so never glob.
+web_ui="${pkg}/dist/server/web-ui"
+entry="$(grep -o -E '/_expo/static/js/web/index-[0-9a-f]+\.js' "${web_ui}/index.html" 2>/dev/null | head -n1 || true)"
+bundle="${web_ui}${entry}"
+if [[ -z "${entry}" || ! -f "${bundle}" ]]; then
+  echo "ERROR: no web UI entry bundle referenced by ${web_ui}/index.html" >&2
+  echo "If upstream changed how index.html loads the bundle, update the bundle lookup in $0." >&2
+  exit 1
+fi
 builtin_ids="$(node -e '
   const s = require("fs").readFileSync(process.argv[1], "utf8");
   const start = s.indexOf("AGENT_PROVIDER_DEFINITIONS\",{enumerable");
