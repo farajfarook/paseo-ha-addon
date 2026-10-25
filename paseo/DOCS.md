@@ -24,6 +24,7 @@ vendor's own installer, and enables each in Paseo. The first start needs interne
 - [Voice and dictation](#voice-and-dictation)
 - [Remote access: relay vs. direct port](#remote-access-relay-vs-direct-port)
 - [Agent providers](#agent-providers)
+- [Codex sandbox execution](#codex-sandbox-execution)
 - [Logging in agents](#logging-in-agents)
 - [Pi packages](#pi-packages)
 - [Git access](#git-access)
@@ -194,7 +195,7 @@ install its CLI and never enables it, so Paseo leaves it out.
 | `codex` | Codex | npm `@openai/codex` |
 | `copilot` | GitHub Copilot CLI | npm `@github/copilot` (sign in with `copilot login` in a terminal, or set `COPILOT_GITHUB_TOKEN` in `env_vars`) |
 | `opencode` | OpenCode | npm `opencode-ai` |
-| `omp` | Oh My Pi | npm `@oh-my-pi/pi-coding-agent` plus the Bun runtime it needs (best effort, see [Known limitations](#known-limitations)) |
+| `omp` | Oh My Pi | Existing standalone `$HOME/.local/bin/omp`, otherwise npm `@oh-my-pi/pi-coding-agent` plus Bun (best effort, see [Known limitations](#known-limitations)) |
 | `muse` | Muse Code (Meta) | the vendor's installer, `https://dev.meta.ai/install.sh`, into `/data/agents/bin/muse` |
 | `antigravity` | Antigravity (Google) | the vendor's installer, `https://antigravity.google/cli/install.sh`, into `/data/agents/bin/antigravity` |
 
@@ -204,6 +205,12 @@ sets each provider's enabled flag in Paseo. A provider is enabled only if it is 
 provider disabled, and the next start retries. Deselecting a provider keeps its login and
 settings under `/data/home`, so selecting it again restores them. With an empty list Paseo
 starts with every provider disabled.
+
+If OMP is selected and `/data/home/.local/bin/omp` reports its version, the add-on
+reuses that standalone installation and adds its directory to the daemon PATH.
+It does not install or update the npm OMP packages in that case. The standalone
+binary is user-managed: deselecting OMP disables the provider but keeps that file.
+If it is missing or cannot run, the existing npm installation path is used.
 
 ### Which versions are installed
 
@@ -230,6 +237,72 @@ No agent CLI is part of the add-on image, and the add-on does not pin their vers
   profile files under `/data/home`; the add-on sets `PATH` itself, so those lines are only a
   leftover and can be ignored.
 - The start log has a `Providers: ...` line with each enabled provider's version.
+
+## Codex sandbox execution
+Codex uses the same persistent CLI installation in Paseo agents and terminals.
+The runtime image includes procps: BusyBox `ps` cannot identify the shared
+app-server in Codex 0.164.0. No `--no-daemon` provider override is required.
+
+For development with network access, add these supported defaults at the top
+of `/data/home/.codex/config.toml`, before any existing TOML table. Preserve the
+other settings and credentials:
+
+```toml
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+network_access = true
+```
+
+Do not add duplicate keys or tables. New Paseo sessions read this configuration;
+explicit per-agent modes can override it. Use Default Permissions, not Full
+Access. Package caches can live inside the workspace; no extra writable home
+directory is necessary. Codex may ask for approval to change the project's
+protected `.git` metadata. The sandbox normally permits reading outside the
+workspace; workspace-write is a write boundary, not a secret vault.
+
+The add-on-specific AppArmor profile retains mount denial for ordinary Paseo
+and terminal processes. Native Codex binaries enter its `codex` child profile,
+which permits mount, remount, unmount and pivot-root operations for Bubblewrap.
+The container does not receive CAP_SYS_ADMIN in its initial user namespace.
+Bubblewrap creates a user namespace, constructs the filesystem view, drops
+capabilities, and applies Codex's seccomp policy. This allowance lets a Codex
+process construct user-namespace mounts; it does not grant host mount access.
+The npm native executables and Codex's managed daemon packages under the
+standard persistent paths are covered. Custom Codex install locations require
+an explicit profile transition and must not use an unsandboxed fallback.
+
+The profile is **prepared but not runtime-validated**. Before releasing or
+deploying it, compile it with `apparmor_parser -Q -T paseo/apparmor.txt`, build
+the image, and run the following checks on the target HAOS host. Merely placing
+the profile inside an existing container does not activate it. Supervisor loads
+`paseo/apparmor.txt` when deploying the add-on. Keep protection mode enabled and
+do not add privileged mode, SYS_ADMIN, unconfined AppArmor, or unconfined seccomp.
+
+Deployment replaces the running container. Schedule a maintenance window and
+back up the add-on first; installing a different local add-on slug creates
+separate private `/data` and does not migrate existing sessions automatically.
+Publish/install the updated source for the **same add-on slug** to retain data.
+Do not edit the Supervisor's cached source as the permanent solution.
+
+After deployment, verify `/proc/self/attr/current` reports the enforcing add-on
+profile in a terminal and its `//codex` child in the Codex process. Confirm the
+container capability bounding set still lacks SYS_ADMIN. Create a fresh Codex
+agent using Paseo's normal interface without custom Codex CLI flags. Ask it to
+run Bash, edit a temporary workspace file, run Git status, and execute
+`tests/codex-sandbox/probe.sh` from this source checkout using the project path
+and a harmless sentinel file prepared outside the workspace. Never use real
+secrets as test targets. The probe checks capability dropping, seccomp, file
+operations, a temporary Git commit/branch, installed runtimes, public HTTPS/Git,
+and npm installation with a workspace cache. It cleans its own temporary files.
+
+Outside the sandbox, verify the sentinel is unchanged. Repeat with a second
+new agent, then after restarting the add-on during the maintenance window.
+Check that an ordinary terminal's namespace mount still fails. Do not claim
+deployment success until these checks pass. See the supported
+[Paseo provider configuration](https://paseo.sh/docs/custom-providers.md) and
+[Codex sandbox configuration](https://learn.chatgpt.com/docs/sandboxing).
 
 ## Logging in agents
 

@@ -73,7 +73,7 @@ ENV ONNXRUNTIME_NODE_INSTALL=skip \
     PATH=/opt/node/bin:$PATH \
     PASEO_HA_PASEO_VERSION=${PASEO_VERSION}
 
-RUN apk add --no-cache nodejs npm nginx git openssh-client bash curl jq libstdc++ coreutils \
+RUN apk add --no-cache nodejs npm nginx git openssh-client bash curl jq libstdc++ coreutils procps \
  && rm -f /etc/nginx/http.d/default.conf
 
 COPY --from=build /opt/node /opt/node
