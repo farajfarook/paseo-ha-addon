@@ -1,0 +1,4 @@
+- [x] Discover selected, runnable standalone OMP and persist its PATH without npm installation.
+- [x] Test repeated starts, deselection, invalid/missing binaries, and npm fallback; run the isolated regression in .github/workflows/lint.yaml.
+- [x] Document user-managed installation ownership and update the existing release entry.
+- [x] Run syntax, ShellCheck, isolated hook regression and documentation checks.

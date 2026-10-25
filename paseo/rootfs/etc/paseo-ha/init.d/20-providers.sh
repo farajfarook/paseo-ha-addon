@@ -294,6 +294,21 @@ for id in "${ALL_PROVIDERS[@]}"; do
   [[ -n "${SELECTED[${id}]:-}" ]] || continue
   old="${STAMPED[${id}]:-}"
 
+  # The standalone OMP installer uses the persistent home, outside our npm
+  # prefix. Reuse it when healthy; never manage or delete the user's binary.
+  # Preserve any managed npm stamp so deselection can still clean those packages.
+  if [[ "${id}" == omp && -x "${HOME}/.local/bin/omp" ]]; then
+    version_seen="$(timeout -k 5 60 "${HOME}/.local/bin/omp" --version 2>/dev/null)" || version_seen=""
+    if [[ -n "${version_seen}" ]]; then
+      PROVIDER_BIN_DIR[omp]="${HOME}/.local/bin"
+      ph_env_prepend_path "${PROVIDER_BIN_DIR[omp]}"
+      NEW_VERSION[omp]="${version_seen%%$'\n'*}"
+      [[ -z "${old}" ]] || NEW_STAMP[omp]="${old}"
+      ph_log_info "Using existing standalone OMP: ${NEW_VERSION[omp]}"
+      continue
+    fi
+  fi
+
   if provider_is_script "${id}"; then
     # The daemon (and agents) find the CLI through PATH; the directory only exists
     # while the provider is selected.

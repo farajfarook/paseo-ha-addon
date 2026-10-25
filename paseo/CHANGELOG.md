@@ -2,6 +2,7 @@
 
 ## 0.13.0-2
 
+- Recognize a working standalone OMP in the persistent home and keep it discoverable and enabled across starts, without reinstalling it through npm or deleting it on deselection.
 - Bundle procps so Codex can identify its shared app-server on Alpine.
 - Prepare an enforcing AppArmor profile with namespace mount permissions scoped to native Codex processes. Deployment validation is required before release.
 - Bundled Paseo **0.13.0** and Pi **1.4.0** are unchanged.

@@ -195,7 +195,7 @@ install its CLI and never enables it, so Paseo leaves it out.
 | `codex` | Codex | npm `@openai/codex` |
 | `copilot` | GitHub Copilot CLI | npm `@github/copilot` (sign in with `copilot login` in a terminal, or set `COPILOT_GITHUB_TOKEN` in `env_vars`) |
 | `opencode` | OpenCode | npm `opencode-ai` |
-| `omp` | Oh My Pi | npm `@oh-my-pi/pi-coding-agent` plus the Bun runtime it needs (best effort, see [Known limitations](#known-limitations)) |
+| `omp` | Oh My Pi | Existing standalone `$HOME/.local/bin/omp`, otherwise npm `@oh-my-pi/pi-coding-agent` plus Bun (best effort, see [Known limitations](#known-limitations)) |
 | `muse` | Muse Code (Meta) | the vendor's installer, `https://dev.meta.ai/install.sh`, into `/data/agents/bin/muse` |
 | `antigravity` | Antigravity (Google) | the vendor's installer, `https://antigravity.google/cli/install.sh`, into `/data/agents/bin/antigravity` |
 
@@ -205,6 +205,12 @@ sets each provider's enabled flag in Paseo. A provider is enabled only if it is 
 provider disabled, and the next start retries. Deselecting a provider keeps its login and
 settings under `/data/home`, so selecting it again restores them. With an empty list Paseo
 starts with every provider disabled.
+
+If OMP is selected and `/data/home/.local/bin/omp` reports its version, the add-on
+reuses that standalone installation and adds its directory to the daemon PATH.
+It does not install or update the npm OMP packages in that case. The standalone
+binary is user-managed: deselecting OMP disables the provider but keeps that file.
+If it is missing or cannot run, the existing npm installation path is used.
 
 ### Which versions are installed
 
