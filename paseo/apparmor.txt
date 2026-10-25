@@ -1,0 +1,131 @@
+# Based on the Apache-2.0 Moby default AppArmor profile.
+# Supervisor renames the single top-level profile to this add-on's ID.
+# No initial-namespace SYS_ADMIN capability is added by this policy.
+abi <abi/3.0>,
+#include <tunables/global>
+
+profile paseo flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+  network,
+  # Disallow obsolete socket families removed from the Linux kernel.
+  # AF_DECnet has no AppArmor family name, so it cannot be denied here.
+  deny network ax25,
+  deny network ipx,
+  deny network appletalk,
+  deny network netrom,
+  deny network rose,
+  deny network econet,
+  deny network atmsvc,
+  deny network irda,
+  deny network wanpipe,
+  deny network isdn,
+  deny network caif,
+  # Disallow AF_ALG (Linux kernel crypto API); see https://copy.fail/
+  deny network alg,
+  # Disallow AF_VSOCK to prevent host/guest communication.
+  deny network vsock,
+  capability,
+  /** rwmlk,
+  # Inherit on ordinary executable basenames; reserve exactly "codex" for
+  # the explicit native-binary transitions below (no overlapping x rules).
+  /**/{[^c/][^/]*,c[^o/][^/]*,co[^d/][^/]*,cod[^e/][^/]*,code[^x/][^/]*,codex[^/][^/]*,c,co,cod,code} ix,
+  umount,
+  # Host (privileged) processes may send signals to container processes.
+  signal (receive) peer=unconfined,
+  # runc may send signals to container processes (for "docker stop").
+  signal (receive) peer=runc,
+  # crun may send signals to container processes (for "docker stop" when used with crun OCI runtime).
+  signal (receive) peer=crun,
+  # dockerd may send signals to container processes (for "docker kill").
+  signal (receive) peer=unconfined,
+  # Container processes may send signals amongst themselves.
+  signal (send,receive) peer=*_paseo{,//*},
+
+  deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+  # deny write to files not in /proc/<number>/** or /proc/sys/**
+  deny @{PROC}/{[^1-9/],[^1-9/][^0-9/],[^1-9s/][^0-9y/][^0-9s/],[^1-9/][^0-9/][^0-9/][^0-9/]*}/** w,
+  deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+
+  deny mount,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  # allow processes within the container to trace each other,
+  # provided all other LSM and yama setting allow it.
+  ptrace (trace,tracedby,read,readby) peer=*_paseo{,//*},
+
+  # Enter before Codex sets no_new_privs. Its bundled Bubblewrap inherits this
+  # child profile; ordinary Paseo/terminal processes retain mount denial.
+  /data/agents/node_modules/@openai/codex-linux-{arm64,x64}/vendor/*/bin/codex cx -> codex,
+  /data/home/.codex/packages/app-server-daemon/releases/**/bin/codex cx -> codex,
+
+  profile codex flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    network,
+    # Disallow obsolete socket families removed from the Linux kernel.
+    # AF_DECnet has no AppArmor family name, so it cannot be denied here.
+    deny network ax25,
+    deny network ipx,
+    deny network appletalk,
+    deny network netrom,
+    deny network rose,
+    deny network econet,
+    deny network atmsvc,
+    deny network irda,
+    deny network wanpipe,
+    deny network isdn,
+    deny network caif,
+    # Disallow AF_ALG (Linux kernel crypto API); see https://copy.fail/
+    deny network alg,
+    # Disallow AF_VSOCK to prevent host/guest communication.
+    deny network vsock,
+    capability,
+    file,
+    umount,
+    # Host (privileged) processes may send signals to container processes.
+    signal (receive) peer=unconfined,
+    # runc may send signals to container processes (for "docker stop").
+    signal (receive) peer=runc,
+    # crun may send signals to container processes (for "docker stop" when used with crun OCI runtime).
+    signal (receive) peer=crun,
+    # dockerd may send signals to container processes (for "docker kill").
+    signal (receive) peer=unconfined,
+    # Container processes may send signals amongst themselves.
+    signal (send,receive) peer=*_paseo{,//*},
+
+    deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
+    # deny write to files not in /proc/<number>/** or /proc/sys/**
+    deny @{PROC}/{[^1-9/],[^1-9/][^0-9/],[^1-9s/][^0-9y/][^0-9s/],[^1-9/][^0-9/][^0-9/][^0-9/]*}/** w,
+    deny @{PROC}/sys/[^k]** w,  # deny /proc/sys except /proc/sys/k* (effectively /proc/sys/kernel)
+    deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,  # deny everything except shm* in /proc/sys/kernel/
+    deny @{PROC}/sysrq-trigger rwklx,
+    deny @{PROC}/kcore rwklx,
+
+    mount,
+    remount,
+    pivot_root,
+
+    deny /sys/[^f]*/** wklx,
+    deny /sys/f[^s]*/** wklx,
+    deny /sys/fs/[^c]*/** wklx,
+    deny /sys/fs/c[^g]*/** wklx,
+    deny /sys/fs/cg[^r]*/** wklx,
+    deny /sys/firmware/** rwklx,
+    deny /sys/devices/virtual/powercap/** rwklx,
+    deny /sys/kernel/security/** rwklx,
+
+    # allow processes within the container to trace each other,
+    # provided all other LSM and yama setting allow it.
+    ptrace (trace,tracedby,read,readby) peer=*_paseo{,//*},
+  }
+}
