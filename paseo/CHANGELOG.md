@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.1-1
+
+- Bundled Paseo **0.13.1** (was 0.13.0). It fixes a startup crash when Show background is on and a project has eight or more workspaces.
+- The ingress adapter needed no change, and there is nothing to do after updating.
+- Bundled Paseo **0.13.1** and Pi **1.4.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.13.0-1
 
 - Bundled Paseo **0.13.0** (was 0.12.0). New in Paseo: connected hosts, so agents can create, prompt and monitor agents on other machines; an All changes view in the Changes pane that shows committed and uncommitted work in one diff; and pasting images or dropping files into terminals. It also fixes agents showing as running after a daemon restart and large Claude sessions showing an empty chat or crashing the daemon.
