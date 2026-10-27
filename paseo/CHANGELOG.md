@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.2-1
+
+- Bundled Paseo **0.13.2** (was 0.13.1). It fixes bottom sheets keeping window-size listeners after they close, plus animation and chat-streaming fixes for the Android app.
+- The bundled GitHub CLI is now 2.103.3 (was 2.103.2). The ingress adapter needed no change, and there is nothing to do after updating.
+- Bundled Paseo **0.13.2** and Pi **1.4.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.13.1-1
 
 - Bundled Paseo **0.13.1** (was 0.13.0). It fixes a startup crash when Show background is on and a project has eight or more workspaces.
