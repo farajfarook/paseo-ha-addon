@@ -7,6 +7,6 @@ labels:
   org.opencontainers.image.source: https://github.com/farajfarook/paseo-ha-addon
   org.opencontainers.image.licenses: Apache-2.0
 args:
-  PASEO_VERSION: 0.13.2
+  PASEO_VERSION: 0.14.0
   HA_CLI_VERSION: 5.6.0
   GH_CLI_VERSION: 2.103.3

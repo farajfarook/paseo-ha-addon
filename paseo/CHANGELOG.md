@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0-1
+
+- Bundled Paseo **0.14.0** (was 0.13.2). New in Paseo: Chat display settings that group tool calls or collapse completed turns, a choice of Enter or Ctrl/Cmd+Enter to send, recalling sent messages with Up and Down, downloadable local speech models in Voice settings, and plugins that can give tools to specific agents. Idle agents now free their runtime after an hour and resume on the next prompt. It also fixes terminal glyph corruption and background Git fetches opening credential prompts.
+- The ingress adapter needed no change, and the `dictation`, `voice_mode` and `speech_provider` options work as before. Paseo 0.14.0 saves speech and idle-cleanup settings in a new format, so to go back to an older add-on version, restore the backup Home Assistant made before this update.
+- Bundled Paseo **0.14.0** and Pi **1.4.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.13.2-1
 
 - Bundled Paseo **0.13.2** (was 0.13.1). It fixes bottom sheets keeping window-size listeners after they close, plus animation and chat-streaming fixes for the Android app.
