@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0-2
+
+- Recognize a working standalone OMP in the persistent home and keep it discoverable and enabled across starts, without reinstalling it through npm or deleting it on deselection.
+- Bundle procps so Codex can identify its shared app-server on Alpine.
+- Prepare an enforcing AppArmor profile with namespace mount permissions scoped to native Codex processes. Deployment validation is required before release.
+- Bundled Paseo **0.14.0** and Pi **1.4.0** are unchanged.
+
 ## 0.14.0-1
 
 - Bundled Paseo **0.14.0** (was 0.13.2). New in Paseo: Chat display settings that group tool calls or collapse completed turns, a choice of Enter or Ctrl/Cmd+Enter to send, recalling sent messages with Up and Down, downloadable local speech models in Voice settings, and plugins that can give tools to specific agents. Idle agents now free their runtime after an hour and resume on the next prompt. It also fixes terminal glyph corruption and background Git fetches opening credential prompts.

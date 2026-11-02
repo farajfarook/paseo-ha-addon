@@ -1,0 +1,6 @@
+- [x] Add procps to the runtime Dockerfile and prepare the scoped enforcing AppArmor profile.
+- [x] Document sandbox defaults, security scope, deployment and verification in paseo/DOCS.md.
+- [x] Add non-destructive sandbox integration checks under paseo/tests/codex-sandbox/.
+- [x] Bump paseo/config.yaml and update paseo/CHANGELOG.md.
+- [x] Run available syntax and documentation checks.
+- [ ] Deploy and validate the AppArmor policy and fresh Paseo agents during a maintenance window; deferred to named change codex-container-sandbox-host-validation.

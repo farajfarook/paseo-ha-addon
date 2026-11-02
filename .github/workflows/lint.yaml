@@ -39,6 +39,9 @@ jobs:
       - name: Run documentation checks
         run: bash paseo/tests/docs/run.sh
 
+      - name: Check standalone OMP discovery
+        run: bash paseo/tests/providers/standalone-omp.sh
+
       # Ingress anchors of the pinned Paseo release: fails if the web UI stops
       # exposing an asset path, the "/ws" path or the connection hint that the
       # nginx sub_filter rules and shim depend on (see README 'Bumping Paseo').
