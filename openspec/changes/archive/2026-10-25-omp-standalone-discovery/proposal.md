@@ -10,4 +10,4 @@ remove the user's standalone executable.
 Scope: paseo/rootfs/etc/paseo-ha/init.d/20-providers.sh,
 paseo/tests/providers/standalone-omp.sh, paseo/DOCS.md, paseo/CHANGELOG.md,
 and .github/workflows/lint.yaml (run the isolated regression in CI).
-The existing PR's 0.13.0-2 version bump covers this change.
+The existing PR's 0.14.0-2 version bump covers this change.
