@@ -5,7 +5,7 @@ Paseo 0.15.1 and 0.15.2 are out (stable, both 2026-11-05). 0.15.1 lets the daemo
 ## What Changes
 
 - Pin Paseo 0.15.2 in `paseo/build.yaml` and both `ARG PASEO_VERSION` lines of `paseo/Dockerfile`; add-on version `0.15.2-1` in `paseo/config.yaml`.
-- CHANGELOG entry naming the bundled Paseo **0.15.2** and Pi **1.5.0**.
+- CHANGELOG entry naming the bundled Paseo **0.15.2** and the Pi release current at release time (**1.5.0**; Pi is installed on start when selected, not bundled in the image).
 
 The bump does not change the add-on's specified behaviour (nothing under `paseo/rootfs/` changes; anchors and providers checked below). There are no companion changes.
 
