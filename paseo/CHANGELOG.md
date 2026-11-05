@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.2-1
+
+- Bundled Paseo **0.15.2** (was 0.15.0). New in Paseo: a first-run setup that walks you through theme, providers, projects, agent orchestration and the mobile app (Settings, General, Show setup again reopens it), project suggestions from the folders where you ran Claude Code, Codex, OpenCode or Pi, and a theme picker with previews. The daemon now starts without terminals, instead of not at all, when its terminal worker cannot start.
+- The ingress adapter needed no change, and there is nothing to do after updating.
+- Bundled Paseo **0.15.2** and Pi **1.5.0** (Pi and the other npm agents still follow their latest stable release).
+
 ## 0.15.0-1
 
 - Bundled Paseo **0.15.0** (was 0.14.0). New in Paseo: terminal programs keep running when the daemon restarts or crashes, an opt-in Resume agents after restart setting (Host settings, Agents) that continues interrupted agents in their conversations, a host setting to turn off usage checks, and copying files listed in `.worktreeinclude` into new worktrees. It also fixes rewinding Claude conversations and Pi tool-result images going missing.
