@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.3-1
+
+- Bundled Paseo **0.15.3** (was 0.15.2). Fixed in Paseo: conversation text no longer turns blurry when the keyboard opens or closes on iOS 26 and later.
+- The ingress adapter needed no change, and there is nothing to do after updating.
+- Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.5.0** when this version was released).
+
 ## 0.15.2-1
 
 - Bundled Paseo **0.15.2** (was 0.15.0). New in Paseo: a first-run setup that walks you through theme, providers, projects, agent orchestration and the mobile app (Settings, General, Show setup again reopens it), project suggestions from the folders where you ran Claude Code, Codex, OpenCode or Pi, and a theme picker with previews. The daemon now starts without terminals, instead of not at all, when its terminal worker cannot start.
