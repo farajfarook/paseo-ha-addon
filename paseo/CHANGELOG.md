@@ -3,7 +3,7 @@
 ## 0.15.4-1
 
 - Bundled Paseo **0.15.4** (was 0.15.3). New in Paseo: the Claude Fable 5.2 and Mythos 5.2 models, with medium effort by default. Both need Claude Code 2.1.321 or newer, and Mythos 5.2 only shows up when your Claude account has access to it.
-- When `claude` is selected in `providers`, the add-on installs the latest stable Claude Code on every start, so the restart after this update already brings a new enough version. The ingress adapter needed no change, and there is nothing else to do after updating.
+- When `claude` is selected in `providers`, the add-on installs the latest stable Claude Code on every start (2.1.322 when this version was released), so the restart after this update normally brings a new enough version. If the npm registry could not be reached or the upgrade was rolled back, the previous version stays installed and the new models do not appear: check the `Providers: claude <version>` line in the add-on log and restart once the registry is reachable. The ingress adapter needed no change.
 - Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.5.1** when this version was released).
 
 ## 0.15.3-1
