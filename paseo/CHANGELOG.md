@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.4-2
+
+- Updated the bundled `ha` CLI to **5.7.0** (was 5.6.0) and GitHub CLI (`gh`) to **2.104.0** (was 2.103.3). `ha` commands run with `--raw-json` now exit with an error code when the Supervisor reports an error (they used to exit 0). On a Supervisor that gives each add-on its own API socket, `ha` talks to it over that socket instead of with the token, with the same permissions. `gh auth status` now shows rate-limit, server and network errors.
+- `gh repo delete` now asks for an extra confirmation, even with `--yes`, when deleting a private or internal repository would also delete its forks. An agent that deletes such a repository without a prompt must add `--accept-cascading-deletion-of-private-forks`. There is nothing to do after updating.
+- Bundled Paseo **0.15.4** is unchanged. Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.5.2** when this version was released).
+
 ## 0.15.4-1
 
 - Bundled Paseo **0.15.4** (was 0.15.3). New in Paseo: the Claude Fable 5.2 and Mythos 5.2 models, with medium effort by default. Both need Claude Code 2.1.321 or newer, and Mythos 5.2 only shows up when your Claude account has access to it.

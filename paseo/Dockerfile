@@ -26,7 +26,7 @@ RUN npm install -g --prefix /opt/node "@getpaseo/cli@${PASEO_VERSION}" \
 # BUILD_ARCH (aarch64|amd64); plain buildx provides TARGETARCH.
 ARG BUILD_ARCH
 ARG TARGETARCH
-ARG HA_CLI_VERSION=5.6.0
+ARG HA_CLI_VERSION=5.7.0
 RUN set -eu; \
     arch="${BUILD_ARCH:-}"; \
     if [ -z "$arch" ]; then \
@@ -44,7 +44,7 @@ RUN set -eu; \
 
 # Static GitHub CLI (`gh`) from cli/cli releases, verified against the release
 # checksums. Agents use it for GitHub and as git's HTTPS credential helper.
-ARG GH_CLI_VERSION=2.103.3
+ARG GH_CLI_VERSION=2.104.0
 RUN set -eu; \
     case "${BUILD_ARCH:-${TARGETARCH:-$(uname -m)}}" in \
       amd64|x86_64) arch=amd64 ;; \
