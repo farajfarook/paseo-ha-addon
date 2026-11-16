@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0-1
+
+- Bundled Paseo **0.16.0** (was 0.15.4). New in Paseo: background tasks you can see and stop above the composer (Claude Code, Codex, OpenCode), a built-in plugin gallery, command center tabs, undo for archiving a workspace, a Change base picker for worktree diffs, background agents and faster diff loading, plus many fixes for Claude, Codex, OpenCode, Pi and ACP agents. If you also use the Paseo desktop or mobile app, update it too to get the new features.
+- New agent provider **fx** (`fx`, Vercel Labs' open-source coding agent). Select it in `providers`: the add-on installs it with its vendor's installer (`https://fx.sh/setup.sh`) into `/data/agents/bin/fx` and enables it in Paseo, so there is no need to add it from Paseo's provider catalog. Sign in with `fx login` in a Paseo terminal, or put `AI_GATEWAY_API_KEY` in `env_vars`. Like Muse Code and Antigravity, it updates itself and gets no Home Assistant skill or MCP tools from the add-on yet.
+- Fixed: selecting `muse` (Muse Code) or `antigravity` never installed them. The add-on downloaded their vendor installer with options curl does not accept, so every start logged `curl: option --fetch-retries=1: is unknown` and left the provider disabled. They now install on the first start after this update. The ingress adapter needed no change, and there is nothing else to do after updating.
+- Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.5.2** when this version was released).
+
 ## 0.15.4-2
 
 - Updated the bundled `ha` CLI to **5.7.0** (was 5.6.0) and GitHub CLI (`gh`) to **2.104.0** (was 2.103.3). `ha` commands run with `--raw-json` now exit with an error code when the Supervisor reports an error (they used to exit 0). On a Supervisor that gives each add-on its own API socket, `ha` talks to it over that socket instead of with the token, with the same permissions. `gh auth status` now shows rate-limit, server and network errors.

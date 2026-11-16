@@ -7,9 +7,9 @@
 # this checkout inside the add-on image, with real npm installs, so it needs
 # network access. No daemon is started.
 #
-# The two providers that are not npm packages (Muse Code, Antigravity) are tested
-# through PASEO_HA_TEST_SCRIPT_URL with a stub vendor installer written into the
-# container, so the test never downloads them (~336 MB for Muse Code alone).
+# The three providers that are not npm packages (Muse Code, Antigravity, fx) are
+# tested through PASEO_HA_TEST_SCRIPT_URL with a stub vendor installer written into
+# the container, so the test never downloads them (~336 MB for Muse Code alone).
 #
 #   paseo/tests/providers/run.sh [image]     (default: paseo-ha-test)
 # ==============================================================================
@@ -78,16 +78,18 @@ run_hook '["pi"]'
 hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 installed pi && pass "pi installed into /data/agents" || fail "pi not installed"
 stamp_has "pi=@earendil-works/pi-coding-agent@${LATEST_PI}" && pass "pi stamped at ${LATEST_PI}" || fail "pi not stamped at latest"
-expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false
+expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false
 log_has "Providers: pi ${LATEST_PI}" && pass "summary line names pi ${LATEST_PI}" || fail "no summary line"
 docker exec "${C}" test -e /data/agents/bin && fail "a provider directory exists without a vendor provider selected" || pass "no vendor provider directory without a selection"
-log_has 'Installing provider (muse|antigravity)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
+log_has 'Installing provider (muse|antigravity|fx)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
 # Hoplite is excluded on purpose: Paseo only registers it once its override exists.
 if docker exec "${C}" jq -e '.agents.providers | has("hoplite") | not' /data/home/.paseo/config.json >/dev/null; then
   pass "no hoplite override written"
 else
   fail "hoplite override written: $(docker exec "${C}" jq -c '.agents.providers.hoplite' /data/home/.paseo/config.json)"
 fi
+# fx also needs its override before Paseo registers it, but it is supported: the
+# override is always written, disabled while fx is not selected (fx=false above).
 
 echo "== [codex]: codex installed; Pi uninstalled like any other provider"
 run_hook '["codex"]'
@@ -143,12 +145,12 @@ stamp_has "codex=@openai/codex@${OTHER_CODEX}" && pass "a later release is insta
 docker exec "${C}" grep -q '^codex=' "${FAILED}" && fail "failed record not cleared" || pass "failed record cleared"
 run_hook '["codex"]'
 
-echo "== [] : uninstalled, all eight disabled, home dir kept"
+echo "== [] : uninstalled, all nine disabled, home dir kept"
 docker exec "${C}" mkdir -p /data/home/.codex
 docker exec "${C}" sh -c 'echo keep > /data/home/.codex/auth.json'
 run_hook '[]'
 installed codex && fail "codex still installed" || pass "codex uninstalled"
-expect_enabled pi=false claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false
+expect_enabled pi=false claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false
 docker exec "${C}" test -f /data/home/.codex/auth.json && pass "credentials kept" || fail "credentials removed"
 hook_rc_ok && pass "hook exits 0 with no providers" || fail "hook exit"
 
@@ -216,7 +218,7 @@ run_hook '["pi","nope"]'
 log_has "Unknown provider 'nope'" && pass "unknown value warned" || fail "no warning"
 hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 
-# --- Script providers (Muse Code, Antigravity) --------------------------------
+# --- Script providers (Muse Code, Antigravity, fx) ----------------------------
 # Neither is on npm, so the hook runs the vendor's installer. A stub installer is
 # written into the container and handed over through PASEO_HA_TEST_SCRIPT_URL, so
 # no test downloads the real thing (Muse Code alone is ~336 MB). The stub installs
@@ -226,8 +228,8 @@ hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 echo "== vendor-installed providers: a stub installer through the test seam"
 docker exec -i "${C}" sh -c 'cat > /tmp/stub-install.sh' <<'STUB'
 #!/bin/sh
-# Stub vendor installer: writes a fake muse/agy into the directory the hook chose.
-dir="${MUSE_INSTALL_DIR:-}"
+# Stub vendor installer: writes a fake muse/agy/fx into the directory the hook chose.
+dir="${MUSE_INSTALL_DIR:-${FX_INSTALL_DIR:-}}"
 if [ -z "${dir}" ]; then
   while [ "$#" -gt 0 ]; do
     case "$1" in --dir) dir="$2"; shift 2 ;; *) shift ;; esac
@@ -236,6 +238,7 @@ fi
 [ -n "${dir}" ] || { echo "stub: no install directory" >&2; exit 2; }
 case "$(basename "${dir}")" in
   muse) bin=muse; ver="Muse Code 1.4.4 (1.4.4-R5419.1)" ;;
+  fx)   bin=fx;   ver=0.0.17 ;;
   *)    bin=agy;  ver=1.3.2 ;;
 esac
 printf '#!/bin/sh\necho "%s"\n' "${ver}" > "${dir}/${bin}"
@@ -245,29 +248,44 @@ echo "stub installer: ${bin} ${ver} into ${dir}"
 STUB
 STUB_URL=/tmp/stub-install.sh
 
-run_hook '["muse","antigravity"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+run_hook '["muse","antigravity","fx"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
 hook_rc_ok && pass "hook exits 0 with script providers" || fail "hook exit"
 script_installed muse muse && pass "muse installed by the vendor installer" || fail "muse not installed"
 script_installed antigravity agy && pass "agy installed by the vendor installer" || fail "agy not installed"
+script_installed fx fx && pass "fx installed by the vendor installer (FX_INSTALL_DIR)" || fail "fx not installed"
 stamp_has "muse=muse@Muse Code 1.4.4 (1.4.4-R5419.1)" && pass "muse stamped at the whole version its CLI reports" || fail "muse not stamped"
 stamp_has "antigravity=agy@1.3.2" && pass "antigravity stamped at the version its CLI reports" || fail "antigravity not stamped"
-expect_enabled muse=true antigravity=true
+stamp_has "fx=fx@0.0.17" && pass "fx stamped at the version its CLI reports" || fail "fx not stamped"
+expect_enabled muse=true antigravity=true fx=true
+log_has 'Providers: .*fx 0\.0\.17' && pass "summary names fx and its version" || fail "no fx in the summary line"
+docker exec "${C}" grep -q '/data/agents/bin/fx' /run/paseo-ha/daemon.env && pass "the fx directory is on the daemon PATH" || fail "fx directory not on PATH"
 log_has 'Providers: muse Muse Code 1.4.4 \(1\.4\.4-R5419\.1\),' && pass "summary names the whole muse version" || fail "no muse summary line"
 docker exec "${C}" grep -q '/data/agents/bin/muse' /run/paseo-ha/daemon.env && pass "the provider directory is on the daemon PATH" || fail "provider directory not on PATH"
 docker exec "${C}" test -e /data/agents/bin/muse/.stub-extra && pass "the installer's other files land in the provider directory" || fail "unexpected install layout"
 
 echo "== a script provider whose CLI runs is never reinstalled"
-run_hook '["muse","antigravity"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
-log_has 'Installing provider (muse|antigravity) from' && fail "a running script provider was reinstalled" || pass "no reinstall while the CLI runs"
+run_hook '["muse","antigravity","fx"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+log_has 'Installing provider (muse|antigravity|fx) from' && fail "a running script provider was reinstalled" || pass "no reinstall while the CLI runs"
 
 echo "== a self-updated script provider keeps working, and its new version is recorded"
 docker exec "${C}" sh -c 'printf "#!/bin/sh\necho 1.5.0\n" > /data/agents/bin/muse/muse'
 run_hook '["muse"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
 stamp_has "muse=muse@1.5.0" && pass "the version the CLI now reports is stamped" || fail "self-updated version not recorded"
 log_has 'Installing provider muse from' && fail "a self-updated provider was reinstalled" || pass "no install for a self-updated CLI"
-expect_enabled muse=true antigravity=false
+expect_enabled muse=true antigravity=false fx=false
+docker exec "${C}" test -e /data/agents/bin/fx && fail "fx directory kept after deselection" || pass "fx directory removed on deselection"
 
-# Antigravity is deselected above, so the stamp only lists muse here.
+echo "== fx deselection keeps its login"
+run_hook '["fx"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+script_installed fx fx && pass "fx installed again" || fail "fx not installed again"
+docker exec "${C}" sh -c 'mkdir -p /data/home/.fx; echo key > /data/home/.fx/api-key'
+run_hook '["muse"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+log_has 'Removing provider fx' && pass "fx removal logged" || fail "no fx removal log"
+docker exec "${C}" test -e /data/agents/bin/fx && fail "fx directory kept" || pass "fx directory removed"
+docker exec "${C}" test -f /data/home/.fx/api-key && pass "fx login kept" || fail "fx login removed"
+expect_enabled fx=false muse=true
+
+# Antigravity and fx are deselected above, so the stamp only lists muse here.
 echo "== deselection removes the provider directory and keeps the login"
 docker exec "${C}" sh -c 'mkdir -p /data/home/.config/muse; echo token > /data/home/.config/muse/auth.json'
 run_hook '["pi"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
@@ -275,7 +293,29 @@ log_has 'Removing provider muse' && pass "removal logged" || fail "no removal lo
 docker exec "${C}" test -e /data/agents/bin/muse && fail "muse directory kept" || pass "muse directory (and its extra files) removed"
 docker exec "${C}" test -e /data/agents/bin/antigravity && fail "antigravity directory kept" || pass "antigravity directory removed"
 docker exec "${C}" test -f /data/home/.config/muse/auth.json && pass "muse login kept" || fail "muse login removed"
-expect_enabled muse=false antigravity=false
+expect_enabled muse=false antigravity=false fx=false
+
+# The seam's local path skips the download; a file:// URL goes through the same
+# curl call as a vendor's https:// URL, without network access.
+echo "== the vendor installer is downloaded with curl (a file:// URL)"
+run_hook '["fx"]' "PASEO_HA_TEST_SCRIPT_URL=file://${STUB_URL}"
+hook_rc_ok && pass "hook exits 0" || fail "hook exit"
+log_has 'is unknown' && fail "curl rejected its options: $(docker exec "${C}" grep -m1 'is unknown' /tmp/hook.log)" || pass "curl accepts its options"
+script_installed fx fx && pass "fx installed from the downloaded installer" || fail "fx not installed from a downloaded installer"
+stamp_has "fx=fx@0.0.17" && pass "fx stamped after a download" || fail "fx not stamped after a download"
+expect_enabled fx=true
+
+echo "== an installer that cannot be downloaded: disabled, logged, retried next start"
+run_hook '["pi"]'
+run_hook '["fx"]' "PASEO_HA_TEST_SCRIPT_URL=file:///nonexistent/install.sh"
+hook_rc_ok && pass "hook exits 0 when the installer cannot be downloaded" || fail "hook exit"
+log_has 'ERROR.*could not download the installer from file:///nonexistent/install.sh' && pass "download failure logged" || fail "download failure not logged"
+expect_enabled fx=false
+docker exec "${C}" test -e /data/agents/bin/fx && fail "a failed download left a directory behind" || pass "a failed download left nothing behind"
+docker exec "${C}" grep -q '^fx=' "${STAMP}" && fail "fx stamped after a failed download" || pass "fx not stamped after a failed download"
+run_hook '["fx"]' "PASEO_HA_TEST_SCRIPT_URL=file://${STUB_URL}"
+script_installed fx fx && pass "download retried on the next start" || fail "download not retried"
+run_hook '["pi"]'
 
 echo "== a failing script install: disabled, logged, retried next start"
 run_hook '["muse"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}" PASEO_HA_TEST_FAIL_INSTALL=muse

@@ -10,11 +10,13 @@
 #     directories are never touched. No provider is baked into the image; Pi is
 #     installed here like the rest. A provider is installed either from npm (the
 #     default) or by its vendor's installer script (`PROVIDER_KIND` = script),
-#     because Muse Code and Antigravity are not published to npm.
+#     because Muse Code, Antigravity and fx are not published to npm.
 #  2. Set agents.providers.<id>.enabled in the persisted Paseo config for all
-#     eight providers: true only if the provider is selected and its CLI runs.
+#     nine providers: true only if the provider is selected and its CLI runs.
 #     Paseo resolves the providers its bundled plugins register through the same
-#     per-provider override, so one mechanism covers both kinds.
+#     per-provider override, so one mechanism covers both kinds. A plugin
+#     provider that Paseo only registers once it is configured (fx) is
+#     registered by that override too, enabled or not.
 #
 # - Each start looks up `<package>@latest` in the npm registry. A prerelease on
 #   the latest tag is ignored. PACKAGE_HOLD pins a package instead of the lookup.
@@ -51,7 +53,7 @@ LOOKUP_TIMEOUT="${PASEO_HA_PROVIDER_LOOKUP_TIMEOUT:-20}"   # seconds per package
 INSTALL_TIMEOUT="${PASEO_HA_PROVIDER_INSTALL_TIMEOUT:-600}"  # seconds per provider install (npm and its scripts)
 
 # Every provider Paseo supports, in `providers` option order.
-ALL_PROVIDERS=(claude codex copilot opencode pi omp muse antigravity)
+ALL_PROVIDERS=(claude codex copilot opencode pi omp muse antigravity fx)
 
 # npm packages per provider (space separated, the CLI's own package last).
 # Only used for npm-installed providers; a script provider has no package.
@@ -73,11 +75,13 @@ declare -A PROVIDER_BIN=(
   [omp]="omp"
   [muse]="muse"
   [antigravity]="agy"
+  [fx]="fx"
 )
 # Install path per provider: "npm" (the default) or "script" (vendor installer).
 declare -A PROVIDER_KIND=(
   [muse]="script"
   [antigravity]="script"
+  [fx]="script"
 )
 # Where the CLI lives. npm providers share the npm bin dir; a script provider gets
 # a directory of its own, so uninstalling it removes exactly the files the vendor
@@ -85,26 +89,31 @@ declare -A PROVIDER_KIND=(
 declare -A PROVIDER_BIN_DIR=(
   [muse]="${SCRIPT_DIR}/muse"
   [antigravity]="${SCRIPT_DIR}/antigravity"
+  [fx]="${SCRIPT_DIR}/fx"
 )
 # Vendor installers for the script providers: the installer is downloaded and run
 # once into the provider's own directory, and the CLI updates itself afterwards.
 declare -A SCRIPT_URL=(
   [muse]="https://dev.meta.ai/install.sh"
   [antigravity]="https://antigravity.google/cli/install.sh"
+  [fx]="https://fx.sh/setup.sh"
 )
 # Shell the vendor documents for running the installer, and the extra arguments and
 # environment variables that put it in our directory (the vendors disagree on how).
 # Muse Code's installer is a bash script despite the documentation's `| sh`, and
-# Alpine's /bin/sh (busybox) would fail on it.
+# Alpine's /bin/sh (busybox) would fail on it. fx's installer downloads a
+# statically linked binary (x86_64 and aarch64), so it runs on the musl images.
 declare -A SCRIPT_SHELL=(
   [muse]="bash"
   [antigravity]="bash"
+  [fx]="bash"
 )
 declare -A SCRIPT_ARGS=(
   [antigravity]="--dir ${PROVIDER_BIN_DIR[antigravity]}"
 )
 declare -A SCRIPT_ENV=(
   [muse]="MUSE_INSTALL_DIR=${PROVIDER_BIN_DIR[muse]}"
+  [fx]="FX_INSTALL_DIR=${PROVIDER_BIN_DIR[fx]}"
 )
 # Maintainer hold: package name -> exact version installed instead of `latest`.
 # Empty by default. Use it when a new agent release breaks with the pinned Paseo.
@@ -249,9 +258,12 @@ install_script() {
   mkdir -p "$(provider_bin_dir "${id}")"
 
   installer="$(mktemp)"
+  # curl's own options: one retry on a transient error, 30 s to connect and 110 s
+  # in all, inside the outer 120 s cap. (npm's --fetch-retries/--fetch-timeout are
+  # not curl options; curl rejected them, so no installer was ever downloaded.)
   if [[ -f "${url}" ]]; then                    # test seam: a local stub installer
     cp "${url}" "${installer}"
-  elif ! timeout -k 5 120 curl -fsSL --fetch-retries=1 --fetch-timeout=60000 \
+  elif ! timeout -k 5 120 curl -fsSL --retry 1 --connect-timeout 30 --max-time 110 \
          -o "${installer}" "${url}" 2>>"${log}"; then
     echo "could not download the installer from ${url}" >>"${log}"
     rm -f "${installer}"
@@ -397,7 +409,7 @@ write_records "${FAILED}" NEW_BAD
 
 # --- Sync Paseo's provider enable flags (the add-on owns these on every start).
 # Paseo's `config set` only accepts the whole agents.providers object (dynamic keys
-# have no per-field path), so read it, merge the eight enabled flags with jq (keeping
+# have no per-field path), so read it, merge the nine enabled flags with jq (keeping
 # any other overrides under agents.providers.<id>) and write it back in one call.
 enabled_list=""
 summary=""

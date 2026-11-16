@@ -25,9 +25,9 @@ domain and verifies the result against real entity states.
 
 ## Why this add-on
 
-- **Eight agents, your subscription.** Claude Code, Codex, GitHub Copilot, OpenCode, Pi
-  (default), Oh My Pi, Muse Code (Meta) and Antigravity (Google). Pick any mix in one
-  option and sign in with the plan or API key you already have.
+- **Nine agents, your subscription.** Claude Code, Codex, GitHub Copilot, OpenCode, Pi
+  (default), Oh My Pi, Muse Code (Meta), Antigravity (Google) and fx (Vercel Labs). Pick
+  any mix in one option and sign in with the plan or API key you already have.
 - **A real UI, not a terminal in an iframe.** Chat, diffs, file explorer, terminals,
   permission prompts and optional voice, from Paseo's web UI. Works on a phone, and the
   Paseo iOS/Android/desktop apps connect through Paseo's encrypted relay or a direct port.
