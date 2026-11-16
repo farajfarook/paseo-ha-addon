@@ -7,8 +7,8 @@
 #   1. its built-in providers - the `id:` of every AGENT_PROVIDER_DEFINITIONS entry
 #      in the web UI bundle, and
 #   2. the providers its bundled plugins register - the `id:` of every
-#      `*-provider` plugin under dist/server/builtin-plugins (Muse Code and
-#      Antigravity are shipped this way).
+#      `*-provider` plugin under dist/server/builtin-plugins (Muse Code,
+#      Antigravity and, from Paseo 0.16.0, fx are shipped this way).
 # Both are registered through the same agents.providers.<id>.enabled override, so
 # the add-on offers both kinds in one option.
 #
