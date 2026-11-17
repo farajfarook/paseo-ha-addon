@@ -4,7 +4,7 @@ The Home Assistant guidance the add-on ships to agents (`paseo/rootfs/opt/paseo-
 
 ## What Changes
 
-- `ha-cli.md`: describe `ha apps` as the current command and `ha addons` as its deprecated alias without naming a CLI major version, and say both forms work on the bundled CLI, so the sentence stays true across pin bumps.
+- `ha-cli.md`: describe `ha apps` as the current command and `ha addons` as its deprecated alias without naming a CLI major version, and say both forms work on the bundled CLI, so the sentence stays true across pin bumps. The same paragraph told agents to "use `ha info`" for the CLI version, but `ha info` returns Home Assistant system information (`/info`), not the version of the local `ha` binary, and `ha` 6.0.0 has neither a `--version` flag nor a `version` command (both checked in the built image). It now says so instead of pointing to `ha info` (CodeRabbit finding on PR #44).
 - `paseo/DOCS.md` ("What agents can do with Home Assistant"): the same, "`ha addons` still works as its deprecated alias".
 
 ## Capabilities
