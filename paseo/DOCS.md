@@ -413,7 +413,7 @@ exports it to the daemon and every agent:
   things that are not in YAML. The image ships a helper for it:
   `paseo-ha-ws '{"type":"config/entity_registry/list"}'`.
 - The `ha` CLI (Supervisor access, `manager` role): `ha core check`, `ha core logs`,
-  `ha core restart`, `ha apps logs <slug>` (in `ha` CLI 5.x `ha addons` is its deprecated
+  `ha core restart`, `ha apps logs <slug>` (`ha addons` still works as its deprecated
   alias), `ha backups new`, `ha supervisor logs`.
 - Restarting Core does not restart this add-on, so an agent can restart HA and keep
   reading the log afterwards.
