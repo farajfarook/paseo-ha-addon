@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.1-1
+
+- Bundled Paseo **0.16.1** (was 0.16.0), a bug-fix release. Claude in Bypass mode now shows a permission card when a `permissions.ask` rule or a hook asks for one, instead of approving the action. Claude sessions no longer fail until `/login` when Paseo refreshes the model list while Claude Code renews its token. Pi model names that contain `/` are shown in full, and an OpenCode question can be answered again after you steer the turn.
+- Updated the bundled `ha` CLI to **6.0.0** (was 5.7.0). `ha` now always talks to the Supervisor directly over plain HTTP or its API socket: it ignores `HTTP_PROXY` and similar variables (also when they are set in `env_vars`), refuses `https://` endpoints and does not follow redirects. Its optional settings file is read only from `~/.homeassistant.yaml`, `.yml` or `.json`. The `ha` commands agents use are unchanged (the bundled Home Assistant guidance now describes `ha apps` and its deprecated `ha addons` alias without naming a CLI version), and there is nothing to do after updating.
+- Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.5.2** when this version was released).
+
 ## 0.16.0-1
 
 - Bundled Paseo **0.16.0** (was 0.15.4). New in Paseo: background tasks you can see and stop above the composer (Claude Code, Codex, OpenCode), a built-in plugin gallery, command center tabs, undo for archiving a workspace, a Change base picker for worktree diffs, background agents and faster diff loading, plus many fixes for Claude, Codex, OpenCode, Pi and ACP agents. If you also use the Paseo desktop or mobile app, update it too to get the new features.

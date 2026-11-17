@@ -33,7 +33,7 @@ Never restore a backup without the user's explicit request.
 
 ## Add-ons
 
-The bundled `ha` CLI 5.x renamed `ha addons` to `ha apps` (`ha addons` still works but prints a deprecation warning). Both forms below work on 5.x. `ha` has no `--version` flag; use `ha info`.
+The `ha` CLI calls add-ons "apps": `ha apps` is the current command, and `ha addons` still works as a deprecated alias that prints a warning. Both forms below work on the bundled CLI. `ha` has no `--version` flag or `version` command, and `ha info` shows Home Assistant system information, not the CLI version.
 
 ```sh
 ha addons                     # installed add-ons with slugs and states

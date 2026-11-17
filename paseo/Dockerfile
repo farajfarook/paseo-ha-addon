@@ -9,7 +9,7 @@ ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 # node-gyp).
 # ---------------------------------------------------------------------------
 FROM ${BUILD_FROM} AS build
-ARG PASEO_VERSION=0.16.0
+ARG PASEO_VERSION=0.16.1
 ENV ONNXRUNTIME_NODE_INSTALL=skip \
     npm_config_update_notifier=false \
     npm_config_fund=false \
@@ -26,7 +26,7 @@ RUN npm install -g --prefix /opt/node "@getpaseo/cli@${PASEO_VERSION}" \
 # BUILD_ARCH (aarch64|amd64); plain buildx provides TARGETARCH.
 ARG BUILD_ARCH
 ARG TARGETARCH
-ARG HA_CLI_VERSION=5.7.0
+ARG HA_CLI_VERSION=6.0.0
 RUN set -eu; \
     arch="${BUILD_ARCH:-}"; \
     if [ -z "$arch" ]; then \
@@ -65,7 +65,7 @@ RUN set -eu; \
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM ${BUILD_FROM}
-ARG PASEO_VERSION=0.16.0
+ARG PASEO_VERSION=0.16.1
 ENV ONNXRUNTIME_NODE_INSTALL=skip \
     npm_config_update_notifier=false \
     npm_config_fund=false \
