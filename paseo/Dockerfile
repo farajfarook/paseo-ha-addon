@@ -44,7 +44,7 @@ RUN set -eu; \
 
 # Static GitHub CLI (`gh`) from cli/cli releases, verified against the release
 # checksums. Agents use it for GitHub and as git's HTTPS credential helper.
-ARG GH_CLI_VERSION=2.104.0
+ARG GH_CLI_VERSION=2.105.0
 RUN set -eu; \
     case "${BUILD_ARCH:-${TARGETARCH:-$(uname -m)}}" in \
       amd64|x86_64) arch=amd64 ;; \

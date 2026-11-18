@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.1-2
+
+- Updated the bundled GitHub CLI (`gh`) to **2.105.0** (was 2.104.0). It adds `gh event listen` and `gh event subscription`, which wait for pull request events (submitted reviews, state and head changes, merge conflicts, finished check suites) instead of polling. GitHub Event Streams is in preview, so these commands only work once GitHub has given your account access. When `gh` detects that an agent is running it, `gh pr create`, `gh pr view` and `gh api` calls on a pull request now print a hint about `gh event listen` on stderr; their normal output and exit codes are unchanged.
+- Bundled Paseo **0.16.1** is unchanged. Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.5.2** when this version was released).
+
 ## 0.16.1-1
 
 - Bundled Paseo **0.16.1** (was 0.16.0), a bug-fix release. Claude in Bypass mode now shows a permission card when a `permissions.ask` rule or a hook asks for one, instead of approving the action. Claude sessions no longer fail until `/login` when Paseo refreshes the model list while Claude Code renews its token. Pi model names that contain `/` are shown in full, and an OpenCode question can be answered again after you steer the turn.
