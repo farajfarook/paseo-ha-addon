@@ -15,7 +15,7 @@
 
 ## 3. Documentation
 - [x] 3.1 `paseo/DOCS.md`: intro, options row, Agent providers section and table, "Which versions are installed" (goose does not update itself; the installer command that updates it), login steps, troubleshooting rows, known limitation (no HA setup for goose)
-- [x] 3.2 `paseo/README.md`, root `README.md`, `SECURITY.md`, bug report template: list goose
+- [x] 3.2 `paseo/README.md`, root `README.md`, `SECURITY.md`, bug report template: list goose; both READMEs say goose is updated by running its installer again and that only Pi, Claude, Codex and OpenCode get the HA MCP server, while Muse Code, Antigravity, fx and goose start without the bundled HA skill and MCP tools (review feedback)
 
 ## 4. Tests
 - [x] 4.1 `paseo/tests/providers/run.sh`: stub installer handles `GOOSE_BIN_DIR` and requires `CONFIGURE=false`; all-provider assertions include goose; goose install, trimmed stamp and summary version, PATH, nothing left in the installer's working directory, enable, no reinstall, removal on deselection
