@@ -243,9 +243,9 @@ No agent CLI is part of the add-on image, and the add-on does not pin their vers
 
   ```sh
   (
-    scratch="$(mktemp -d)"
+    scratch="$(mktemp -d)" || exit 1
     trap 'rm -rf -- "$scratch"' EXIT
-    cd -- "$scratch"
+    cd -- "$scratch" || exit 1
     curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh \
       | GOOSE_BIN_DIR=/data/agents/bin/goose CONFIGURE=false bash
   )
