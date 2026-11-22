@@ -77,11 +77,11 @@ proved people want this. This add-on is the next step:
 
 | | Terminal add-ons | Paseo add-on |
 |---|---|---|
-| Agents | Claude Code only | 8, selectable, mixed |
+| Agents | Claude Code only | 10, selectable, mixed |
 | Interface | `ttyd` terminal in an iframe | Paseo web UI: chat, diffs, files, terminals, voice |
 | Mobile | terminal in a phone browser | Paseo mobile apps via relay, or the web UI |
-| Agent version | baked into the image | latest stable on every start, auto-rollback |
-| HA awareness | manual | HA APIs, `ha` CLI, HA MCP server, bundled skill |
+| Agent version | baked into the image | npm agents: latest stable on every start, auto-rollback; Muse Code, Antigravity, fx: self-updating; goose: rerun its installer |
+| HA awareness | manual | HA APIs and `ha` CLI for all; HA MCP server and bundled skill for the agents the add-on configures |
 | Safety net | none | config check before reload, optional git snapshots |
 | Other add-on configs | usually not mounted | `/addon_configs` read-write |
 
