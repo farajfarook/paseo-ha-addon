@@ -238,8 +238,19 @@ No agent CLI is part of the add-on image, and the add-on does not pin their vers
   leftover and can be ignored.
 - **goose is installed the same way but does not update itself.** Its musl build, the one that runs
   in the add-on, has no `goose update` command, so goose stays at the version first
-  installed. To update it, run its installer again in a Paseo terminal:
-  `curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | GOOSE_BIN_DIR=/data/agents/bin/goose CONFIGURE=false bash`.
+  installed. To update it, run its installer again in a Paseo terminal. The installer
+  downloads its archive into the current directory, so run it from a scratch directory:
+
+  ```sh
+  (
+    scratch="$(mktemp -d)"
+    trap 'rm -rf -- "$scratch"' EXIT
+    cd -- "$scratch"
+    curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh \
+      | GOOSE_BIN_DIR=/data/agents/bin/goose CONFIGURE=false bash
+  )
+  ```
+
   Deselecting and selecting `goose` again (with a restart each time) does the same. The
   next start records the new version.
 - The start log has a `Providers: ...` line with each enabled provider's version.

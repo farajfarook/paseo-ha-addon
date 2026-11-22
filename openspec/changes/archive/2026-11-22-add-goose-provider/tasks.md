@@ -14,7 +14,7 @@
 - [x] 2.6 `.github/scripts/check-providers.sh`: comment names goose; the check passes for 0.17.1 and still fails for 0.16.2 (which has no goose) with the extended option
 
 ## 3. Documentation
-- [x] 3.1 `paseo/DOCS.md`: intro, options row, Agent providers section and table, "Which versions are installed" (goose does not update itself; the installer command that updates it), login steps, troubleshooting rows, known limitation (no HA setup for goose)
+- [x] 3.1 `paseo/DOCS.md`: intro, options row, Agent providers section and table, "Which versions are installed" (goose does not update itself; the installer command that updates it, run from a scratch directory that is removed afterwards), login steps, troubleshooting rows, known limitation (no HA setup for goose)
 - [x] 3.2 `paseo/README.md`, root `README.md`, `SECURITY.md`, bug report template: list goose; both READMEs say goose is updated by running its installer again and that only Pi, Claude, Codex and OpenCode get the HA MCP server, while Muse Code, Antigravity, fx and goose start without the bundled HA skill and MCP tools (review feedback)
 
 ## 4. Tests
