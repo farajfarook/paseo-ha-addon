@@ -10,12 +10,14 @@
 #     directories are never touched. No provider is baked into the image; Pi is
 #     installed here like the rest. A provider is installed either from npm (the
 #     default) or by its vendor's installer script (`PROVIDER_KIND` = script),
-#     because Muse Code, Antigravity and fx are not published to npm.
+#     because Muse Code, Antigravity, fx and goose are not published to npm
+#     (goose's npm package only carries a glibc binary, which the Alpine image
+#     cannot run).
 #  2. Set agents.providers.<id>.enabled in the persisted Paseo config for all
-#     nine providers: true only if the provider is selected and its CLI runs.
+#     ten providers: true only if the provider is selected and its CLI runs.
 #     Paseo resolves the providers its bundled plugins register through the same
 #     per-provider override, so one mechanism covers both kinds. A plugin
-#     provider that Paseo only registers once it is configured (fx) is
+#     provider that Paseo only registers once it is configured (fx, goose) is
 #     registered by that override too, enabled or not.
 #
 # - Each start looks up `<package>@latest` in the npm registry. A prerelease on
@@ -24,8 +26,9 @@
 #   (stamp file /data/agents/.paseo-ha-providers.stamp, lines `id=name@ver ...`).
 # - A script provider is installed into its own directory under
 #   /data/agents/bin and never looked up in the registry: the vendor's installer
-#   runs once, and the CLI updates itself afterwards. Each start records the
-#   version the CLI reports, and nothing is downloaded while it answers.
+#   runs once, and the CLI updates itself afterwards (goose's musl build cannot;
+#   running its installer again updates it). Each start records the version the
+#   CLI reports, and nothing is downloaded while it answers.
 # - No registry: an installed provider keeps its version; a missing one stays
 #   disabled and is retried on the next start.
 # - An upgrade whose CLI fails --version is rolled back to the stamped version and
@@ -53,7 +56,7 @@ LOOKUP_TIMEOUT="${PASEO_HA_PROVIDER_LOOKUP_TIMEOUT:-20}"   # seconds per package
 INSTALL_TIMEOUT="${PASEO_HA_PROVIDER_INSTALL_TIMEOUT:-600}"  # seconds per provider install (npm and its scripts)
 
 # Every provider Paseo supports, in `providers` option order.
-ALL_PROVIDERS=(claude codex copilot opencode pi omp muse antigravity fx)
+ALL_PROVIDERS=(claude codex copilot opencode pi omp muse antigravity fx goose)
 
 # npm packages per provider (space separated, the CLI's own package last).
 # Only used for npm-installed providers; a script provider has no package.
@@ -76,12 +79,14 @@ declare -A PROVIDER_BIN=(
   [muse]="muse"
   [antigravity]="agy"
   [fx]="fx"
+  [goose]="goose"
 )
 # Install path per provider: "npm" (the default) or "script" (vendor installer).
 declare -A PROVIDER_KIND=(
   [muse]="script"
   [antigravity]="script"
   [fx]="script"
+  [goose]="script"
 )
 # Where the CLI lives. npm providers share the npm bin dir; a script provider gets
 # a directory of its own, so uninstalling it removes exactly the files the vendor
@@ -90,6 +95,7 @@ declare -A PROVIDER_BIN_DIR=(
   [muse]="${SCRIPT_DIR}/muse"
   [antigravity]="${SCRIPT_DIR}/antigravity"
   [fx]="${SCRIPT_DIR}/fx"
+  [goose]="${SCRIPT_DIR}/goose"
 )
 # Vendor installers for the script providers: the installer is downloaded and run
 # once into the provider's own directory, and the CLI updates itself afterwards.
@@ -97,16 +103,22 @@ declare -A SCRIPT_URL=(
   [muse]="https://dev.meta.ai/install.sh"
   [antigravity]="https://antigravity.google/cli/install.sh"
   [fx]="https://fx.sh/setup.sh"
+  [goose]="https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh"
 )
 # Shell the vendor documents for running the installer, and the extra arguments and
 # environment variables that put it in our directory (the vendors disagree on how).
 # Muse Code's installer is a bash script despite the documentation's `| sh`, and
 # Alpine's /bin/sh (busybox) would fail on it. fx's installer downloads a
 # statically linked binary (x86_64 and aarch64), so it runs on the musl images.
+# goose's installer picks its musl build when bash reports a musl OSTYPE (as on
+# Alpine); CONFIGURE=false skips its interactive `goose configure` step. That
+# portable build has no `goose update`, so goose is updated by running its
+# installer again (DOCS.md).
 declare -A SCRIPT_SHELL=(
   [muse]="bash"
   [antigravity]="bash"
   [fx]="bash"
+  [goose]="bash"
 )
 declare -A SCRIPT_ARGS=(
   [antigravity]="--dir ${PROVIDER_BIN_DIR[antigravity]}"
@@ -114,6 +126,7 @@ declare -A SCRIPT_ARGS=(
 declare -A SCRIPT_ENV=(
   [muse]="MUSE_INSTALL_DIR=${PROVIDER_BIN_DIR[muse]}"
   [fx]="FX_INSTALL_DIR=${PROVIDER_BIN_DIR[fx]}"
+  [goose]="GOOSE_BIN_DIR=${PROVIDER_BIN_DIR[goose]} CONFIGURE=false"
 )
 # Maintainer hold: package name -> exact version installed instead of `latest`.
 # Empty by default. Use it when a new agent release breaks with the pinned Paseo.
@@ -186,8 +199,13 @@ provider_version() {
   local bin out
   bin="$(provider_bin "$1")" || return 1
   out="$(timeout -k 5 60 env PATH="$(provider_bin_dir "$1"):${PATH}" "${bin}" --version 2>/dev/null)" || return 1
+  # The first non-blank line, without surrounding blanks: goose prints its version
+  # with a leading space.
+  out="$(printf '%s\n' "${out}" | grep -m1 '[^[:space:]]')" || return 1
+  out="${out#"${out%%[![:space:]]*}"}"
+  out="${out%"${out##*[![:space:]]}"}"
   [[ -n "${out}" ]] || return 1
-  printf '%s\n' "${out%%$'\n'*}"
+  printf '%s\n' "${out}"
 }
 
 # provider_runs <id> -> true when the provider's CLI answers --version.
@@ -249,7 +267,7 @@ install_specs() {
 # only counts against it when the CLI does not run afterwards: a vendor's
 # post-install step failing must not turn into a reinstall loop. Output in $log.
 install_script() {
-  local id="$1" url shell installer rc
+  local id="$1" url shell installer workdir rc
   in_csv "${id}" "${PASEO_HA_TEST_FAIL_INSTALL:-}" && { echo "test seam: ${id} fails" >"${log}"; return 1; }
   url="${PASEO_HA_TEST_SCRIPT_URL:-${SCRIPT_URL[${id}]}}"
   shell="${SCRIPT_SHELL[${id}]}"
@@ -270,10 +288,14 @@ install_script() {
     return 1
   fi
 
+  # Run it in a scratch directory: some installers (goose) download their archive
+  # into the current directory, which would leave a partial download behind on a
+  # failure.
+  workdir="$(mktemp -d)"
   # shellcheck disable=SC2086  # args is a space-separated list from SCRIPT_ARGS
-  env ${SCRIPT_ENV[${id}]:-} timeout -k 10 "${INSTALL_TIMEOUT}" "${shell}" "${installer}" ${SCRIPT_ARGS[${id}]:-} >"${log}" 2>&1
+  (cd "${workdir}" && env ${SCRIPT_ENV[${id}]:-} timeout -k 10 "${INSTALL_TIMEOUT}" "${shell}" "${installer}" ${SCRIPT_ARGS[${id}]:-}) >"${log}" 2>&1
   rc=$?
-  rm -f "${installer}"
+  rm -rf "${installer}" "${workdir}"
 
   if provider_version "${id}" >>"${log}" 2>&1; then
     [[ ${rc} -eq 0 ]] || echo "the installer exited with ${rc}, but ${PROVIDER_BIN[${id}]} runs" >>"${log}"
@@ -409,7 +431,7 @@ write_records "${FAILED}" NEW_BAD
 
 # --- Sync Paseo's provider enable flags (the add-on owns these on every start).
 # Paseo's `config set` only accepts the whole agents.providers object (dynamic keys
-# have no per-field path), so read it, merge the nine enabled flags with jq (keeping
+# have no per-field path), so read it, merge the ten enabled flags with jq (keeping
 # any other overrides under agents.providers.<id>) and write it back in one call.
 enabled_list=""
 summary=""

@@ -25,18 +25,21 @@ domain and verifies the result against real entity states.
 
 ## Why this add-on
 
-- **Nine agents, your subscription.** Claude Code, Codex, GitHub Copilot, OpenCode, Pi
-  (default), Oh My Pi, Muse Code (Meta), Antigravity (Google) and fx (Vercel Labs). Pick
-  any mix in one option and sign in with the plan or API key you already have.
+- **Ten agents, your subscription.** Claude Code, Codex, GitHub Copilot, OpenCode, Pi
+  (default), Oh My Pi, Muse Code (Meta), Antigravity (Google), fx (Vercel Labs) and goose
+  (AAIF). Pick any mix in one option and sign in with the plan or API key you already have.
 - **A real UI, not a terminal in an iframe.** Chat, diffs, file explorer, terminals,
   permission prompts and optional voice, from Paseo's web UI. Works on a phone, and the
   Paseo iOS/Android/desktop apps connect through Paseo's encrypted relay or a direct port.
-- **Always current.** Every selected agent CLI is installed at its latest stable release on
-  each start, with automatic rollback if a new release does not run. No waiting for an
-  add-on update to get a new Claude or Codex.
-- **Knows Home Assistant.** Agents get the Core REST and WebSocket APIs, the `ha` CLI, the
-  Home Assistant MCP server (auto-wired when enabled) and a bundled HA skill that enforces
-  edit → `check_config` → reload → verify.
+- **Always current.** Every selected npm agent CLI is installed at its latest stable release
+  on each start, with automatic rollback if a new release does not run. No waiting for an
+  add-on update to get a new Claude or Codex. Muse Code, Antigravity and fx update
+  themselves; goose stays at its first-installed version until you run its installer again.
+- **Knows Home Assistant.** Agents get the Core REST and WebSocket APIs and the `ha` CLI.
+  Pi, Claude, Codex and OpenCode also get the Home Assistant MCP server (auto-wired when
+  enabled), and the agents the add-on configures get a bundled HA skill that enforces
+  edit → `check_config` → reload → verify. Muse Code, Antigravity, fx and goose start
+  without the skill and the MCP tools.
 - **Undo button.** Optional git snapshots of `/homeassistant` so every agent change is a
   commit you can review or revert.
 - **Sees your whole box.** `/homeassistant`, every add-on's config (Node-RED, ESPHome, …),
@@ -74,11 +77,11 @@ proved people want this. This add-on is the next step:
 
 | | Terminal add-ons | Paseo add-on |
 |---|---|---|
-| Agents | Claude Code only | 8, selectable, mixed |
+| Agents | Claude Code only | 10, selectable, mixed |
 | Interface | `ttyd` terminal in an iframe | Paseo web UI: chat, diffs, files, terminals, voice |
 | Mobile | terminal in a phone browser | Paseo mobile apps via relay, or the web UI |
-| Agent version | baked into the image | latest stable on every start, auto-rollback |
-| HA awareness | manual | HA APIs, `ha` CLI, HA MCP server, bundled skill |
+| Agent version | baked into the image | npm agents: latest stable on every start, auto-rollback; Muse Code, Antigravity, fx: self-updating; goose: rerun its installer |
+| HA awareness | manual | HA APIs and `ha` CLI for all; HA MCP server and bundled skill for the agents the add-on configures |
 | Safety net | none | config check before reload, optional git snapshots |
 | Other add-on configs | usually not mounted | `/addon_configs` read-write |
 

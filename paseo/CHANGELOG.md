@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.1-1
+
+- Bundled Paseo **0.17.1** (was 0.16.2), which includes 0.17.0. Antigravity now has permission modes, tool approvals and session history (it needs Antigravity CLI 1.5.0 or later; the add-on installs its latest release, which then updates itself). You can start a workspace in an existing worktree or from a branch or pull request, ask an agent to watch a pull request for new checks, reviews and comments, and see an agent's heartbeats next to its background tasks. Usage shows quota forecasts and OpenRouter balances. Messages from other agents now wait for the current turn to end. Many fixes, among them chat history no longer timing out after a reconnect and long Claude chats reopening faster.
+- New agent provider: goose (open source, from the Agentic AI Foundation, formerly Block). Add `goose` to `providers` to use it. The add-on installs it with goose's own installer into `/data/agents/bin/goose` (about 160 MB). Set it up with `goose configure` in a Paseo terminal, or put `GOOSE_PROVIDER`, `GOOSE_MODEL` and that provider's API key in `env_vars`. Unlike the other vendor-installed agents, goose does not update itself here: run its installer again to update it (see the documentation).
+- Paseo can now show each agent's installed version and offer to update some of them from its settings. In the add-on, restart it instead: every start installs the latest stable release of the npm agents, and Pi refuses the in-app update because the add-on manages its install.
+- Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.6.0** when this version was released).
+
 ## 0.16.2-1
 
 - Bundled Paseo **0.16.2** (was 0.16.1), a bug-fix release. Agents no longer get stuck after you press Stop a second time, Steer no longer cancels a Claude compaction in progress, and Collapse turns no longer hides a finished Claude reply. Archiving a workspace no longer loses commits made in a detached worktree, creating a worktree no longer times out on large ignored folders, and a failed file download no longer takes over the web UI. There is nothing to do after updating.
