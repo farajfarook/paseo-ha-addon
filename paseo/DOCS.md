@@ -11,8 +11,8 @@ agent can read and edit your Home Assistant configuration and check its work aga
 live API instead of guessing.
 
 Pick the agents you want in the `providers` option (Pi, Claude, Codex, Copilot, OpenCode,
-Oh My Pi, Muse Code, Antigravity, fx; Pi by default). On every start the add-on installs the
-latest stable release of each selected npm CLI, installs the three remaining ones with their
+Oh My Pi, Muse Code, Antigravity, fx, goose; Pi by default). On every start the add-on installs
+the latest stable release of each selected npm CLI, installs the four remaining ones with their
 vendor's own installer, and enables each in Paseo. The first start needs internet access.
 
 ## Table of contents
@@ -94,7 +94,7 @@ add-on start.
 |---|---|---|
 | `workspace` | string, `/homeassistant` | Directory new terminals and agent sessions start in. Created if missing. Set it to another mapped path (e.g. `/share/paseo`) to work somewhere else by default. |
 | `git_snapshot` | boolean, `false` | Keep `/homeassistant` under git for review and rollback. See [Git snapshots](#git-snapshots-and-rollback). |
-| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`, `fx`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi, `muse` is Muse Code, `fx` is Vercel Labs' fx). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` are installed from npm at their latest stable release; `muse`, `antigravity` and `fx` are not on npm, so their vendor's installer runs once (Muse Code is a ~336 MB download) and the CLI updates itself afterwards. Pi is installed the same way as the npm ones and is selected by default. A working `muse`, `antigravity` or `fx` CLI is never downloaded again; an npm provider is downloaded again only when a newer stable release is out. A failed install only disables that provider. See [Agent providers](#agent-providers). |
+| `providers` | list of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`, `fx`, `goose`; default `[pi]` | The agent providers to offer, using Paseo's own provider IDs (`omp` is Oh My Pi, `muse` is Muse Code, `fx` is Vercel Labs' fx). Selected providers have their CLI installed into `/data/agents` and are enabled in Paseo; every other provider is uninstalled and disabled. `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` are installed from npm at their latest stable release; `muse`, `antigravity`, `fx` and `goose` are installed by their vendor's installer, which runs once (Muse Code is a ~336 MB download, goose ~160 MB), and the CLI updates itself afterwards (goose is updated by running its installer again, see [Which versions are installed](#which-versions-are-installed)). Pi is installed the same way as the npm ones and is selected by default. A working `muse`, `antigravity`, `fx` or `goose` CLI is never downloaded again; an npm provider is downloaded again only when a newer stable release is out. A failed install only disables that provider. See [Agent providers](#agent-providers). |
 | `env_vars` | list of `{name, value}`, `[]` | Environment variables exported to the daemon and therefore to every agent — e.g. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`. **Only the names are logged, never the values.** |
 | `password` | string, empty | Password required for direct-port access. It is never asked for on the sidebar/ingress path. See [Relay vs. direct port](#remote-access-relay-vs-direct-port). |
 | `hostnames` | list of strings, `[]` | Extra DNS names the daemon accepts on the direct port (`PASEO_HOSTNAMES`), e.g. `paseo.example.com`, when you reach HA through a proxy or a custom name. |
@@ -185,11 +185,12 @@ The sidebar path never asks for the password: nginx authenticates to the daemon 
 ## Agent providers
 
 The `providers` option lists the same providers Paseo supports — its six built-in ones
-plus the three it ships as bundled plugins. The one exception is Hoplite, a sponsored
+plus the four it ships as bundled plugins. The one exception is Hoplite, a sponsored
 provider bundled with Paseo 0.11.3 and later: the add-on does not offer it, does not
 install its CLI and never enables it, so Paseo leaves it out. fx (Paseo 0.16.0 and later)
-is one Paseo only lists once it is configured; the add-on configures it on every start,
-so you select it here instead of adding it from Paseo's provider catalog.
+and goose (Paseo 0.17.0 and later) are providers Paseo only lists once they are configured;
+the add-on configures them on every start, so you select them here instead of adding them
+from Paseo's provider catalog.
 
 | ID | Agent | Installed from |
 |---|---|---|
@@ -202,6 +203,7 @@ so you select it here instead of adding it from Paseo's provider catalog.
 | `muse` | Muse Code (Meta) | the vendor's installer, `https://dev.meta.ai/install.sh`, into `/data/agents/bin/muse` |
 | `antigravity` | Antigravity (Google) | the vendor's installer, `https://antigravity.google/cli/install.sh`, into `/data/agents/bin/antigravity` |
 | `fx` | fx (Vercel Labs) | the vendor's installer, `https://fx.sh/setup.sh`, into `/data/agents/bin/fx` (sign in with `fx login` in a terminal, or set `AI_GATEWAY_API_KEY` in `env_vars`) |
+| `goose` | goose (AAIF, formerly Block) | the vendor's installer, `https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh`, into `/data/agents/bin/goose` (its musl build; set up a model provider with `goose configure` in a terminal, or set `GOOSE_PROVIDER`, `GOOSE_MODEL` and that provider's API key in `env_vars`) |
 
 On every start the add-on installs the selected providers, removes the deselected ones and
 sets each provider's enabled flag in Paseo. A provider is enabled only if it is selected
@@ -234,7 +236,18 @@ No agent CLI is part of the add-on image, and the add-on does not pin their vers
   `/data/home`, is untouched). A vendor installer may also append a PATH line to your shell
   profile files under `/data/home`; the add-on sets `PATH` itself, so those lines are only a
   leftover and can be ignored.
+- **goose is installed the same way but does not update itself.** Its musl build, the one that runs
+  in the add-on, has no `goose update` command, so goose stays at the version first
+  installed. To update it, run its installer again in a Paseo terminal:
+  `curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | GOOSE_BIN_DIR=/data/agents/bin/goose CONFIGURE=false bash`.
+  Deselecting and selecting `goose` again (with a restart each time) does the same. The
+  next start records the new version.
 - The start log has a `Providers: ...` line with each enabled provider's version.
+- **Updating from Paseo's provider settings.** Paseo 0.17.0 and later show each provider's
+  installed version and can offer to update Pi, Copilot, OpenCode and Oh My Pi from the app.
+  In the add-on, restart it instead: each start installs the latest stable release from npm.
+  Pi refuses the in-app update here ("pi cannot self-update this installation"), because the
+  add-on, not a global npm install, manages it.
 
 ## Logging in agents
 
@@ -243,7 +256,7 @@ installed it (until you remove it from `providers`). To authenticate:
 
 1. Open Paseo from the sidebar and start a terminal session.
 2. Run the agent's login flow, e.g. `pi` (then its auth command), `claude`, `codex login`,
-   `copilot login`, `opencode auth login`, `muse`, `agy` or `fx login`.
+   `copilot login`, `opencode auth login`, `muse`, `agy`, `fx login` or `goose configure`.
 3. Or skip interactive login entirely by putting the provider key in `env_vars` (for
    example `ANTHROPIC_API_KEY`).
 
@@ -574,11 +587,11 @@ Open the add-on **Log** tab. The daemon's own output is there too.
 | `Port 6767 is mapped but no password is set; the daemon stays loopback-only` | Set `password` to enable direct access, or unmap the port. |
 | `A password is set but port 6767 is not mapped...` | Harmless: the password only applies to the direct port. Ingress never asks for it. |
 | `Local speech engine (sherpa-onnx-node) cannot load on this platform` | Dictation and voice mode were turned off and nothing was downloaded. Use `speech_provider: openai` with `OPENAI_API_KEY` in `env_vars`. |
-| `Provider <id> could not be installed or does not run on <arch>` | That provider is disabled in Paseo and retried on the next start. Pi and the other providers still work. For `muse`, `antigravity` and `fx` this can also mean the vendor's installer could not be downloaded. |
+| `Provider <id> could not be installed or does not run on <arch>` | That provider is disabled in Paseo and retried on the next start. Pi and the other providers still work. For `muse`, `antigravity`, `fx` and `goose` this can also mean the vendor's installer could not be downloaded. |
 | `Provider <id> is not installed and the npm registry could not be reached` | The add-on has no network access to npm. That provider stays disabled until a start that can reach `registry.npmjs.org`. |
 | `Could not check for a newer <id>; keeping the installed version` | Harmless: the registry was unreachable, so the installed version is used. |
 | `Provider <id> <package>@<version> could not be installed or does not run on <arch>; rolling back` | A new release is broken here. The previous version was restored and that release is skipped from now on. |
-| `Unknown provider '<name>' in providers option` | The value is ignored. Use one of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`, `fx`. |
+| `Unknown provider '<name>' in providers option` | The value is ignored. Use one of `claude`, `codex`, `copilot`, `opencode`, `pi`, `omp`, `muse`, `antigravity`, `fx`, `goose`. |
 | `Skill '<name>' ... has the same name as a Paseo built-in skill; skipped` | Rename your skill folder so Paseo's own skill sync cannot conflict. |
 | `Moved existing <dir> to <dir>.paseo-ha-backup-...` | A real tool folder was in the way of a `/config` link. Move your files into `/config` and delete the backup. |
 | `SUPERVISOR_TOKEN is not set` | The container is not running under the Supervisor (e.g. a plain `docker run`). API access is unavailable. |
@@ -631,10 +644,10 @@ session.
   agents, one workspace and one set of credentials.
 - **Local speech is unavailable on the Alpine (musl) images** where the prebuilt ONNX
   runtime cannot load; use `speech_provider: openai`.
-- **Muse Code, Antigravity and fx get no Home Assistant setup from the add-on.** The bundled HA
-  skill, the agent instructions (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, …) and the
-  Home Assistant MCP server are written in each CLI's own configuration format, and the
-  add-on does not know those three. Agents on `muse`, `antigravity` or `fx` therefore start without
+- **Muse Code, Antigravity, fx and goose get no Home Assistant setup from the add-on.** The
+  bundled HA skill, the agent instructions (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, …)
+  and the Home Assistant MCP server are written in each CLI's own configuration format, and
+  the add-on does not know those four. Agents on `muse`, `antigravity`, `fx` or `goose` therefore start without
   the bundled HA guidance and without the HA MCP tools; they can still use the `ha` CLI and
   the `SUPERVISOR_TOKEN` in the terminal. Wiring them needs its own change.
 - **Backups of `/data` are large** once speech models and agent CLIs are installed; a

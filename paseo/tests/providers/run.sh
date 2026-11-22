@@ -7,7 +7,7 @@
 # this checkout inside the add-on image, with real npm installs, so it needs
 # network access. No daemon is started.
 #
-# The three providers that are not npm packages (Muse Code, Antigravity, fx) are
+# The four providers that are not npm packages (Muse Code, Antigravity, fx, goose) are
 # tested through PASEO_HA_TEST_SCRIPT_URL with a stub vendor installer written into
 # the container, so the test never downloads them (~336 MB for Muse Code alone).
 #
@@ -78,18 +78,19 @@ run_hook '["pi"]'
 hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 installed pi && pass "pi installed into /data/agents" || fail "pi not installed"
 stamp_has "pi=@earendil-works/pi-coding-agent@${LATEST_PI}" && pass "pi stamped at ${LATEST_PI}" || fail "pi not stamped at latest"
-expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false
+expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false goose=false
 log_has "Providers: pi ${LATEST_PI}" && pass "summary line names pi ${LATEST_PI}" || fail "no summary line"
 docker exec "${C}" test -e /data/agents/bin && fail "a provider directory exists without a vendor provider selected" || pass "no vendor provider directory without a selection"
-log_has 'Installing provider (muse|antigravity|fx)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
+log_has 'Installing provider (muse|antigravity|fx|goose)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
 # Hoplite is excluded on purpose: Paseo only registers it once its override exists.
 if docker exec "${C}" jq -e '.agents.providers | has("hoplite") | not' /data/home/.paseo/config.json >/dev/null; then
   pass "no hoplite override written"
 else
   fail "hoplite override written: $(docker exec "${C}" jq -c '.agents.providers.hoplite' /data/home/.paseo/config.json)"
 fi
-# fx also needs its override before Paseo registers it, but it is supported: the
-# override is always written, disabled while fx is not selected (fx=false above).
+# fx and goose also need their override before Paseo registers them, but they are
+# supported: the override is always written, disabled while they are not selected
+# (fx=false goose=false above).
 
 echo "== [codex]: codex installed; Pi uninstalled like any other provider"
 run_hook '["codex"]'
@@ -150,7 +151,7 @@ docker exec "${C}" mkdir -p /data/home/.codex
 docker exec "${C}" sh -c 'echo keep > /data/home/.codex/auth.json'
 run_hook '[]'
 installed codex && fail "codex still installed" || pass "codex uninstalled"
-expect_enabled pi=false claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false
+expect_enabled pi=false claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false goose=false
 docker exec "${C}" test -f /data/home/.codex/auth.json && pass "credentials kept" || fail "credentials removed"
 hook_rc_ok && pass "hook exits 0 with no providers" || fail "hook exit"
 
@@ -218,7 +219,7 @@ run_hook '["pi","nope"]'
 log_has "Unknown provider 'nope'" && pass "unknown value warned" || fail "no warning"
 hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 
-# --- Script providers (Muse Code, Antigravity, fx) ----------------------------
+# --- Script providers (Muse Code, Antigravity, fx, goose) ----------------------------
 # Neither is on npm, so the hook runs the vendor's installer. A stub installer is
 # written into the container and handed over through PASEO_HA_TEST_SCRIPT_URL, so
 # no test downloads the real thing (Muse Code alone is ~336 MB). The stub installs
@@ -228,8 +229,8 @@ hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 echo "== vendor-installed providers: a stub installer through the test seam"
 docker exec -i "${C}" sh -c 'cat > /tmp/stub-install.sh' <<'STUB'
 #!/bin/sh
-# Stub vendor installer: writes a fake muse/agy/fx into the directory the hook chose.
-dir="${MUSE_INSTALL_DIR:-${FX_INSTALL_DIR:-}}"
+# Stub vendor installer: writes a fake muse/agy/fx/goose into the directory the hook chose.
+dir="${MUSE_INSTALL_DIR:-${FX_INSTALL_DIR:-${GOOSE_BIN_DIR:-}}}"
 if [ -z "${dir}" ]; then
   while [ "$#" -gt 0 ]; do
     case "$1" in --dir) dir="$2"; shift 2 ;; *) shift ;; esac
@@ -239,16 +240,21 @@ fi
 case "$(basename "${dir}")" in
   muse) bin=muse; ver="Muse Code 1.4.4 (1.4.4-R5419.1)" ;;
   fx)   bin=fx;   ver=0.0.17 ;;
+  goose)
+    # goose's installer would run the interactive `goose configure` unless told not to.
+    [ "${CONFIGURE:-}" = false ] || { echo "stub: goose installer would prompt" >&2; exit 4; }
+    bin=goose; ver=" 1.60.2" ;;   # goose prints its version with a leading space
   *)    bin=agy;  ver=1.3.2 ;;
 esac
 printf '#!/bin/sh\necho "%s"\n' "${ver}" > "${dir}/${bin}"
 chmod +x "${dir}/${bin}"
 touch "${dir}/.stub-extra"
+touch "${PWD}/stub-download.tar.bz2"   # some installers download into the working directory
 echo "stub installer: ${bin} ${ver} into ${dir}"
 STUB
 STUB_URL=/tmp/stub-install.sh
 
-run_hook '["muse","antigravity","fx"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+run_hook '["muse","antigravity","fx","goose"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
 hook_rc_ok && pass "hook exits 0 with script providers" || fail "hook exit"
 script_installed muse muse && pass "muse installed by the vendor installer" || fail "muse not installed"
 script_installed antigravity agy && pass "agy installed by the vendor installer" || fail "agy not installed"
@@ -256,7 +262,12 @@ script_installed fx fx && pass "fx installed by the vendor installer (FX_INSTALL
 stamp_has "muse=muse@Muse Code 1.4.4 (1.4.4-R5419.1)" && pass "muse stamped at the whole version its CLI reports" || fail "muse not stamped"
 stamp_has "antigravity=agy@1.3.2" && pass "antigravity stamped at the version its CLI reports" || fail "antigravity not stamped"
 stamp_has "fx=fx@0.0.17" && pass "fx stamped at the version its CLI reports" || fail "fx not stamped"
-expect_enabled muse=true antigravity=true fx=true
+script_installed goose goose && pass "goose installed by the vendor installer (GOOSE_BIN_DIR, CONFIGURE=false)" || fail "goose not installed"
+stamp_has "goose=goose@1.60.2" && pass "goose stamped at its version without the leading space" || fail "goose not stamped at 1.60.2"
+log_has 'Providers: .*goose 1\.60\.2' && pass "summary names goose and its version" || fail "no goose in the summary line"
+docker exec "${C}" grep -q '/data/agents/bin/goose' /run/paseo-ha/daemon.env && pass "the goose directory is on the daemon PATH" || fail "goose directory not on PATH"
+[[ -z "$(docker exec "${C}" find / -xdev -name stub-download.tar.bz2 2>/dev/null)" ]] && pass "nothing an installer downloads into its working directory is left behind" || fail "an installer download was left behind"
+expect_enabled muse=true antigravity=true fx=true goose=true
 log_has 'Providers: .*fx 0\.0\.17' && pass "summary names fx and its version" || fail "no fx in the summary line"
 docker exec "${C}" grep -q '/data/agents/bin/fx' /run/paseo-ha/daemon.env && pass "the fx directory is on the daemon PATH" || fail "fx directory not on PATH"
 log_has 'Providers: muse Muse Code 1.4.4 \(1\.4\.4-R5419\.1\),' && pass "summary names the whole muse version" || fail "no muse summary line"
@@ -264,16 +275,17 @@ docker exec "${C}" grep -q '/data/agents/bin/muse' /run/paseo-ha/daemon.env && p
 docker exec "${C}" test -e /data/agents/bin/muse/.stub-extra && pass "the installer's other files land in the provider directory" || fail "unexpected install layout"
 
 echo "== a script provider whose CLI runs is never reinstalled"
-run_hook '["muse","antigravity","fx"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
-log_has 'Installing provider (muse|antigravity|fx) from' && fail "a running script provider was reinstalled" || pass "no reinstall while the CLI runs"
+run_hook '["muse","antigravity","fx","goose"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+log_has 'Installing provider (muse|antigravity|fx|goose) from' && fail "a running script provider was reinstalled" || pass "no reinstall while the CLI runs"
 
 echo "== a self-updated script provider keeps working, and its new version is recorded"
 docker exec "${C}" sh -c 'printf "#!/bin/sh\necho 1.5.0\n" > /data/agents/bin/muse/muse'
 run_hook '["muse"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
 stamp_has "muse=muse@1.5.0" && pass "the version the CLI now reports is stamped" || fail "self-updated version not recorded"
 log_has 'Installing provider muse from' && fail "a self-updated provider was reinstalled" || pass "no install for a self-updated CLI"
-expect_enabled muse=true antigravity=false fx=false
+expect_enabled muse=true antigravity=false fx=false goose=false
 docker exec "${C}" test -e /data/agents/bin/fx && fail "fx directory kept after deselection" || pass "fx directory removed on deselection"
+docker exec "${C}" test -e /data/agents/bin/goose && fail "goose directory kept after deselection" || pass "goose directory removed on deselection"
 
 echo "== fx deselection keeps its login"
 run_hook '["fx"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
@@ -285,7 +297,7 @@ docker exec "${C}" test -e /data/agents/bin/fx && fail "fx directory kept" || pa
 docker exec "${C}" test -f /data/home/.fx/api-key && pass "fx login kept" || fail "fx login removed"
 expect_enabled fx=false muse=true
 
-# Antigravity and fx are deselected above, so the stamp only lists muse here.
+# Antigravity, fx and goose are deselected above, so the stamp only lists muse here.
 echo "== deselection removes the provider directory and keeps the login"
 docker exec "${C}" sh -c 'mkdir -p /data/home/.config/muse; echo token > /data/home/.config/muse/auth.json'
 run_hook '["pi"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
@@ -293,7 +305,7 @@ log_has 'Removing provider muse' && pass "removal logged" || fail "no removal lo
 docker exec "${C}" test -e /data/agents/bin/muse && fail "muse directory kept" || pass "muse directory (and its extra files) removed"
 docker exec "${C}" test -e /data/agents/bin/antigravity && fail "antigravity directory kept" || pass "antigravity directory removed"
 docker exec "${C}" test -f /data/home/.config/muse/auth.json && pass "muse login kept" || fail "muse login removed"
-expect_enabled muse=false antigravity=false fx=false
+expect_enabled muse=false antigravity=false fx=false goose=false
 
 # The seam's local path skips the download; a file:// URL goes through the same
 # curl call as a vendor's https:// URL, without network access.

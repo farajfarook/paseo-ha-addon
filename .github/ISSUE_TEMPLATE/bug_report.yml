@@ -21,7 +21,7 @@ body:
     attributes:
       label: Providers selected
       multiple: true
-      options: [pi, claude, codex, copilot, opencode, omp, muse, antigravity, fx]
+      options: [pi, claude, codex, copilot, opencode, omp, muse, antigravity, fx, goose]
   - type: dropdown
     id: access
     attributes:

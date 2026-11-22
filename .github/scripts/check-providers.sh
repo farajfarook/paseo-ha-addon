@@ -8,7 +8,8 @@
 #      in the web UI bundle, and
 #   2. the providers its bundled plugins register - the `id:` of every
 #      `*-provider` plugin under dist/server/builtin-plugins (Muse Code,
-#      Antigravity and, from Paseo 0.16.0, fx are shipped this way).
+#      Antigravity, fx from Paseo 0.16.0 and goose from Paseo 0.17.0 are
+#      shipped this way).
 # Both are registered through the same agents.providers.<id>.enabled override, so
 # the add-on offers both kinds in one option.
 #
