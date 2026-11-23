@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17.3-1
+
+- Bundled Paseo **0.17.3** (was 0.17.1), which includes 0.17.2. Chats can show per-turn and session stats (time, tokens, cache and cost) for Claude, OpenCode v2, Pi, Oh My Pi and plugin providers, enabled providers refresh their model lists every 30 minutes, and the sidebar usage summary is on by default. Provider settings link to each provider's docs and have fuller diagnostic reports. Fixes include Tab or Enter in the slash menu no longer archiving an agent by running a stale `/exit`, busy host connections no longer dropping, Antigravity turns no longer staying busy after creating a schedule, Antigravity Orchestrator chats opening again, and the `/` and `@` pickers no longer disappearing after going back to a workspace. There is nothing to do after updating.
+- Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.6.0** when this version was released).
+
 ## 0.17.1-1
 
 - Bundled Paseo **0.17.1** (was 0.16.2), which includes 0.17.0. Antigravity now has permission modes, tool approvals and session history (it needs Antigravity CLI 1.5.0 or later; the add-on installs its latest release, which then updates itself). You can start a workspace in an existing worktree or from a branch or pull request, ask an agent to watch a pull request for new checks, reviews and comments, and see an agent's heartbeats next to its background tasks. Usage shows quota forecasts and OpenRouter balances. Messages from other agents now wait for the current turn to end. Many fixes, among them chat history no longer timing out after a reconnect and long Claude chats reopening faster.

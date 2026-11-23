@@ -40,8 +40,11 @@ if [[ -z "${pkg}" ]]; then
 fi
 
 # Provider IDs shipped by Paseo: the `id:` of every AGENT_PROVIDER_DEFINITIONS entry.
-# The definitions live in the web UI bundle (shared with the server); take the array
-# between AGENT_PROVIDER_DEFINITIONS' `l=[` and the dev-only `d=[` list.
+# The definitions live in the web UI bundle (shared with the server). The minifier
+# renames the array variables between releases (0.17.1: `l` holds the providers and
+# `d` the dev-only list; 0.17.3 swaps them), so read the variable name from the
+# AGENT_PROVIDER_DEFINITIONS getter and take that array literal up to its closing
+# bracket.
 # The bundle is the entry script index.html loads. Other index-<hash>.js files can
 # sit next to it (since 0.13.0 a lazy barcode-detector chunk does), so never glob.
 web_ui="${pkg}/dist/server/web-ui"
@@ -54,13 +57,32 @@ if [[ -z "${entry}" || ! -f "${bundle}" ]]; then
 fi
 builtin_ids="$(node -e '
   const s = require("fs").readFileSync(process.argv[1], "utf8");
-  const start = s.indexOf("AGENT_PROVIDER_DEFINITIONS\",{enumerable");
-  const arr = s.indexOf("l=[{id:", start);
-  const end = s.indexOf(",d=[{id:", arr);
-  if (start < 0 || arr < 0 || end < 0) { console.error("provider definitions not found"); process.exit(1); }
-  // Provider entries carry defaultModeId; mode entries (id/label/description/icon) do not.
-  const re = /\{id:"([a-z0-9-]+)",label:"[^"]*",description:"(?:[^"\\]|\\.)*",(?:enabledByDefault:![01],)?defaultModeId:/g;
-  const ids = [...s.slice(arr, end).matchAll(re)].map(m => m[1]);
+  const fail = (why) => { console.error("provider definitions not found (" + why + ")"); process.exit(1); };
+  // The leading quote keeps DEV_AGENT_PROVIDER_DEFINITIONS from matching.
+  const getter = /"AGENT_PROVIDER_DEFINITIONS",\{enumerable:!0,get:function\(\)\{return ([A-Za-z_$][\w$]*)\}\}/.exec(s);
+  if (!getter) fail("no AGENT_PROVIDER_DEFINITIONS getter");
+  const name = getter[1].replace(/\$/g, "\\$");
+  const decl = new RegExp("(?<![\\w$])" + name + "=\\[\\{id:", "g");
+  decl.lastIndex = getter.index;
+  const found = decl.exec(s);
+  if (!found) fail("no " + getter[1] + "=[{id: array after the getter");
+  // Walk to the bracket that closes the array, skipping string literals.
+  const open = found.index + getter[1].length + 1;
+  let depth = 0, end = -1, quote = null;
+  for (let i = open; i < s.length; i++) {
+    const c = s[i];
+    if (quote) { if (c === "\\") i++; else if (c === quote) quote = null; continue; }
+    if (c === "\"" || c === "\x27" || c === "`") quote = c;
+    else if (c === "[" || c === "{" || c === "(") depth++;
+    else if (c === "]" || c === "}" || c === ")") { if (--depth === 0) { end = i; break; } }
+  }
+  if (end < 0) fail("unterminated " + getter[1] + " array");
+  // Provider entries carry defaultModeId; mode entries (id/label/description/icon) do
+  // not. Simple string or boolean fields may sit between description and
+  // defaultModeId (enabledByDefault since 0.11, docsUrl since 0.17.2).
+  const re = /\{id:"([a-z0-9-]+)",label:"[^"]*",description:"(?:[^"\\]|\\.)*",(?:[A-Za-z]+:(?:"(?:[^"\\]|\\.)*"|![01]),)*defaultModeId:/g;
+  const ids = [...s.slice(open, end + 1).matchAll(re)].map(m => m[1]);
+  if (ids.length === 0) fail("no provider entries in " + getter[1]);
   console.log(ids.sort().join("\n"));
 ' "${bundle}")"
 
