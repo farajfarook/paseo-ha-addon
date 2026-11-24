@@ -1,0 +1,29 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# hermes-gateway: keep Hermes Agent's gateway runtime running while the `hermes`
+# provider is selected. Hermes' clients (`hermes acp`, which Paseo starts for
+# every Hermes agent, and the `hermes` TUI) attach to a running gateway. When none
+# runs, Hermes starts one through the host's service manager, and inside any s6
+# container it assumes its own Docker image (a `gateway-<profile>` s6 service, a
+# `hermes` user, /opt/data) and fails with service_identity_unverified. So the
+# add-on supervises the gateway itself: --no-supervise keeps `gateway run` in the
+# foreground instead of redirecting to s6, --external-supervisor makes
+# `hermes update` hand the gateway back to s6 (it exits and this service starts
+# the updated code), and --replace takes over from a stray gateway. -q and the
+# stdout redirect keep its logging and start banner out of the add-on log
+# (Hermes writes its logs to ~/.hermes/logs; a crash still reaches stderr).
+# ==============================================================================
+# shellcheck source=/usr/local/lib/paseo-ha/common.sh
+source /usr/local/lib/paseo-ha/common.sh
+ph_load_env
+
+# 20-providers.sh puts Hermes' CLI directory on PATH only while `hermes` is
+# selected, and the CLI exists only once it is installed.
+if ! command -v hermes >/dev/null 2>&1; then
+  exit 0   # finish: not restarted until the next add-on start
+fi
+
+cd "${HOME}" || exit 1
+ph_log_info "Starting the Hermes gateway (logs in ${HOME}/.hermes/logs)"
+exec hermes gateway run --no-supervise --external-supervisor --replace -q >/dev/null

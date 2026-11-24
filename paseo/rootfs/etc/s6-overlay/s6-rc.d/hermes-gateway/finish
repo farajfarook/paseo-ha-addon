@@ -1,0 +1,39 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# hermes-gateway finish: no restart when Hermes is not selected or installed, or
+# when the gateway reports a fatal configuration error (exit 78, EX_CONFIG);
+# otherwise s6 restarts it (`hermes update` handing it back with exit 75, or a
+# crash).
+# ==============================================================================
+readonly exit_code_service="${1}"
+readonly exit_code_signal="${2}"
+
+# Orderly stop by s6 (container shutdown or service down): nothing to do.
+if [[ "${exit_code_service}" -eq 256 && "${exit_code_signal}" -eq 15 ]]; then
+  exit 0
+fi
+if [[ "$(s6-svstat -o wantedup . 2>/dev/null)" == "false" ]]; then
+  exit 0
+fi
+# shellcheck source=/usr/local/lib/paseo-ha/common.sh
+source /usr/local/lib/paseo-ha/common.sh
+ph_load_env
+if ! command -v hermes >/dev/null 2>&1; then
+  exit 125
+fi
+if [[ "${exit_code_service}" -eq 78 ]]; then
+  bashio::log.error "The Hermes gateway stopped on a configuration error; see ${HOME}/.hermes/logs/errors.log. It is started again on the next add-on start."
+  exit 125
+fi
+# 75 (EX_TEMPFAIL): the gateway asks its external supervisor for a restart, e.g.
+# after `hermes update` has replaced its code.
+if [[ "${exit_code_service}" -eq 75 ]]; then
+  bashio::log.info "The Hermes gateway asked for a restart (for example after hermes update); restarting it"
+  exit 0
+fi
+bashio::log.warning "The Hermes gateway exited with code ${exit_code_service}; restarting it"
+# s6-supervise waits a second between restarts; a little more keeps a crash loop
+# quiet (finish scripts must end within 5 s).
+sleep 2
+exit 0

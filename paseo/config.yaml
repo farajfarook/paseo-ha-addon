@@ -1,7 +1,7 @@
 name: Paseo
-version: "0.17.3-1"
+version: "0.17.4-1"
 slug: paseo
-description: Configure Home Assistant with coding agents (Pi, Claude, Codex, Copilot, OpenCode, Oh My Pi, Muse Code, Antigravity, fx, goose) from the sidebar
+description: Configure Home Assistant with coding agents (Pi, Claude, Codex, Copilot, OpenCode, Oh My Pi, Muse Code, Antigravity, fx, goose, Hermes) from the sidebar
 url: https://github.com/farajfarook/paseo-ha-addon
 arch:
   - aarch64
@@ -45,7 +45,7 @@ schema:
   workspace: str
   git_snapshot: bool
   providers:
-    - list(claude|codex|copilot|opencode|pi|omp|muse|antigravity|fx|goose)
+    - list(claude|codex|copilot|opencode|pi|omp|muse|antigravity|fx|goose|hermes)
   env_vars:
     - name: match(^[A-Za-z_][A-Za-z0-9_]*$)
       value: password

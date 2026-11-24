@@ -7,8 +7,8 @@
 # this checkout inside the add-on image, with real npm installs, so it needs
 # network access. No daemon is started.
 #
-# The four providers that are not npm packages (Muse Code, Antigravity, fx, goose) are
-# tested through PASEO_HA_TEST_SCRIPT_URL with a stub vendor installer written into
+# The five providers that are not npm packages (Muse Code, Antigravity, fx, goose,
+# Hermes) are tested through PASEO_HA_TEST_SCRIPT_URL with a stub vendor installer written into
 # the container, so the test never downloads them (~336 MB for Muse Code alone).
 #
 #   paseo/tests/providers/run.sh [image]     (default: paseo-ha-test)
@@ -78,19 +78,19 @@ run_hook '["pi"]'
 hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 installed pi && pass "pi installed into /data/agents" || fail "pi not installed"
 stamp_has "pi=@earendil-works/pi-coding-agent@${LATEST_PI}" && pass "pi stamped at ${LATEST_PI}" || fail "pi not stamped at latest"
-expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false goose=false
+expect_enabled pi=true claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false goose=false hermes=false
 log_has "Providers: pi ${LATEST_PI}" && pass "summary line names pi ${LATEST_PI}" || fail "no summary line"
 docker exec "${C}" test -e /data/agents/bin && fail "a provider directory exists without a vendor provider selected" || pass "no vendor provider directory without a selection"
-log_has 'Installing provider (muse|antigravity|fx|goose)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
+log_has 'Installing provider (muse|antigravity|fx|goose|hermes)' && fail "a vendor installer ran without a selection" || pass "no vendor installer without a selection"
 # Hoplite is excluded on purpose: Paseo only registers it once its override exists.
 if docker exec "${C}" jq -e '.agents.providers | has("hoplite") | not' /data/home/.paseo/config.json >/dev/null; then
   pass "no hoplite override written"
 else
   fail "hoplite override written: $(docker exec "${C}" jq -c '.agents.providers.hoplite' /data/home/.paseo/config.json)"
 fi
-# fx and goose also need their override before Paseo registers them, but they are
-# supported: the override is always written, disabled while they are not selected
-# (fx=false goose=false above).
+# fx, goose and hermes also need their override before Paseo registers them, but
+# they are supported: the override is always written, disabled while they are not
+# selected (fx=false goose=false hermes=false above).
 
 echo "== [codex]: codex installed; Pi uninstalled like any other provider"
 run_hook '["codex"]'
@@ -146,12 +146,12 @@ stamp_has "codex=@openai/codex@${OTHER_CODEX}" && pass "a later release is insta
 docker exec "${C}" grep -q '^codex=' "${FAILED}" && fail "failed record not cleared" || pass "failed record cleared"
 run_hook '["codex"]'
 
-echo "== [] : uninstalled, all nine disabled, home dir kept"
+echo "== [] : uninstalled, all eleven disabled, home dir kept"
 docker exec "${C}" mkdir -p /data/home/.codex
 docker exec "${C}" sh -c 'echo keep > /data/home/.codex/auth.json'
 run_hook '[]'
 installed codex && fail "codex still installed" || pass "codex uninstalled"
-expect_enabled pi=false claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false goose=false
+expect_enabled pi=false claude=false codex=false copilot=false opencode=false omp=false muse=false antigravity=false fx=false goose=false hermes=false
 docker exec "${C}" test -f /data/home/.codex/auth.json && pass "credentials kept" || fail "credentials removed"
 hook_rc_ok && pass "hook exits 0 with no providers" || fail "hook exit"
 
@@ -219,7 +219,7 @@ run_hook '["pi","nope"]'
 log_has "Unknown provider 'nope'" && pass "unknown value warned" || fail "no warning"
 hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 
-# --- Script providers (Muse Code, Antigravity, fx, goose) ----------------------------
+# --- Script providers (Muse Code, Antigravity, fx, goose, Hermes) --------------------
 # Neither is on npm, so the hook runs the vendor's installer. A stub installer is
 # written into the container and handed over through PASEO_HA_TEST_SCRIPT_URL, so
 # no test downloads the real thing (Muse Code alone is ~336 MB). The stub installs
@@ -229,7 +229,9 @@ hook_rc_ok && pass "hook exits 0" || fail "hook exit"
 echo "== vendor-installed providers: a stub installer through the test seam"
 docker exec -i "${C}" sh -c 'cat > /tmp/stub-install.sh' <<'STUB'
 #!/bin/sh
-# Stub vendor installer: writes a fake muse/agy/fx/goose into the directory the hook chose.
+# Stub vendor installer: writes a fake muse/agy/fx/goose/hermes into the directory the hook chose.
+[ -n "${STUB_SLOW:-}" ] && sleep "${STUB_SLOW}"
+args=" $* "
 dir="${MUSE_INSTALL_DIR:-${FX_INSTALL_DIR:-${GOOSE_BIN_DIR:-}}}"
 if [ -z "${dir}" ]; then
   while [ "$#" -gt 0 ]; do
@@ -237,6 +239,23 @@ if [ -z "${dir}" ]; then
   done
 fi
 [ -n "${dir}" ] || { echo "stub: no install directory" >&2; exit 2; }
+case "$(basename "${dir}")" in
+  hermes-agent)
+    # Hermes' installer clones into --dir, which must not exist or be empty; it would
+    # prompt for setup unless --non-interactive; Chromium and cua-driver have no musl
+    # builds; and its hash-locked uv sync fails with the HA base image's extra index.
+    if [ -e "${dir}" ] && [ -n "$(ls -A "${dir}")" ]; then echo "stub: ${dir} exists and is not a Hermes git checkout" >&2; exit 5; fi
+    for flag in --non-interactive --skip-browser --skip-computer-use; do
+      case "${args}" in *" ${flag} "*) ;; *) echo "stub: hermes installer run without ${flag}" >&2; exit 4 ;; esac
+    done
+    [ -z "${UV_EXTRA_INDEX_URL+x}${PIP_EXTRA_INDEX_URL+x}" ] || { echo "stub: uv sync would fail on the extra wheel index" >&2; exit 6; }
+    mkdir -p "${dir}/.hermes/bin"
+    printf '#!/bin/sh\necho "Hermes Agent v0.23.4 (2026.9.24) · stable · local 8fc037444731"\necho "Install directory: %s"\n' "${dir}" > "${dir}/.hermes/bin/hermes"
+    chmod +x "${dir}/.hermes/bin/hermes"
+    touch "${PWD}/stub-download.tar.bz2"
+    echo "stub installer: hermes into ${dir}"
+    exit 0 ;;
+esac
 case "$(basename "${dir}")" in
   muse) bin=muse; ver="Muse Code 1.4.4 (1.4.4-R5419.1)" ;;
   fx)   bin=fx;   ver=0.0.17 ;;
@@ -254,7 +273,8 @@ echo "stub installer: ${bin} ${ver} into ${dir}"
 STUB
 STUB_URL=/tmp/stub-install.sh
 
-run_hook '["muse","antigravity","fx","goose"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
+docker exec "${C}" sh -c 'test -n "${UV_EXTRA_INDEX_URL:-}" && test -n "${PIP_EXTRA_INDEX_URL:-}"' && pass "the image sets the HA wheel index variables (the Hermes check below is real)" || fail "the image no longer sets UV_EXTRA_INDEX_URL/PIP_EXTRA_INDEX_URL"
+run_hook '["muse","antigravity","fx","goose","hermes"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
 hook_rc_ok && pass "hook exits 0 with script providers" || fail "hook exit"
 script_installed muse muse && pass "muse installed by the vendor installer" || fail "muse not installed"
 script_installed antigravity agy && pass "agy installed by the vendor installer" || fail "agy not installed"
@@ -267,7 +287,12 @@ stamp_has "goose=goose@1.60.2" && pass "goose stamped at its version without the
 log_has 'Providers: .*goose 1\.60\.2' && pass "summary names goose and its version" || fail "no goose in the summary line"
 docker exec "${C}" grep -q '/data/agents/bin/goose' /run/paseo-ha/daemon.env && pass "the goose directory is on the daemon PATH" || fail "goose directory not on PATH"
 [[ -z "$(docker exec "${C}" find / -xdev -name stub-download.tar.bz2 2>/dev/null)" ]] && pass "nothing an installer downloads into its working directory is left behind" || fail "an installer download was left behind"
-expect_enabled muse=true antigravity=true fx=true goose=true
+expect_enabled muse=true antigravity=true fx=true goose=true hermes=true
+HERMES_CLI=/data/agents/bin/hermes/hermes-agent/.hermes/bin
+docker exec "${C}" test -x "${HERMES_CLI}/hermes" && pass "hermes installed into its checkout (non-interactive, no browser or computer use, without the HA wheel index)" || fail "hermes not installed: $(docker exec "${C}" grep -m1 'stub:' /tmp/hook.log)"
+stamp_has "hermes=hermes@Hermes Agent v0.23.4 (2026.9.24) · stable · local 8fc037444731" && pass "hermes stamped at the first line of its --version" || fail "hermes not stamped"
+log_has 'Providers: .*hermes Hermes Agent v0\.23\.4' && pass "summary names hermes and its version" || fail "no hermes in the summary line"
+docker exec "${C}" grep -q "${HERMES_CLI}" /run/paseo-ha/daemon.env && pass "the hermes CLI directory inside its checkout is on the daemon PATH" || fail "hermes CLI directory not on PATH"
 log_has 'Providers: .*fx 0\.0\.17' && pass "summary names fx and its version" || fail "no fx in the summary line"
 docker exec "${C}" grep -q '/data/agents/bin/fx' /run/paseo-ha/daemon.env && pass "the fx directory is on the daemon PATH" || fail "fx directory not on PATH"
 log_has 'Providers: muse Muse Code 1.4.4 \(1\.4\.4-R5419\.1\),' && pass "summary names the whole muse version" || fail "no muse summary line"
@@ -276,15 +301,18 @@ docker exec "${C}" test -e /data/agents/bin/muse/.stub-extra && pass "the instal
 
 echo "== a script provider whose CLI runs is never reinstalled"
 run_hook '["muse","antigravity","fx","goose"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
-log_has 'Installing provider (muse|antigravity|fx|goose) from' && fail "a running script provider was reinstalled" || pass "no reinstall while the CLI runs"
+log_has 'Installing provider (muse|antigravity|fx|goose|hermes) from' && fail "a running script provider was reinstalled" || pass "no reinstall while the CLI runs"
 
 echo "== a self-updated script provider keeps working, and its new version is recorded"
 docker exec "${C}" sh -c 'printf "#!/bin/sh\necho 1.5.0\n" > /data/agents/bin/muse/muse'
+docker exec "${C}" sh -c 'mkdir -p /data/home/.hermes/tools; echo key > /data/home/.hermes/.env'
 run_hook '["muse"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}"
 stamp_has "muse=muse@1.5.0" && pass "the version the CLI now reports is stamped" || fail "self-updated version not recorded"
 log_has 'Installing provider muse from' && fail "a self-updated provider was reinstalled" || pass "no install for a self-updated CLI"
-expect_enabled muse=true antigravity=false fx=false goose=false
+expect_enabled muse=true antigravity=false fx=false goose=false hermes=false
 docker exec "${C}" test -e /data/agents/bin/fx && fail "fx directory kept after deselection" || pass "fx directory removed on deselection"
+docker exec "${C}" test -e /data/agents/bin/hermes && fail "hermes directory kept after deselection" || pass "hermes directory (its whole checkout) removed on deselection"
+docker exec "${C}" test -f /data/home/.hermes/.env && pass "hermes settings and runtime under /data/home/.hermes kept" || fail "hermes home removed"
 docker exec "${C}" test -e /data/agents/bin/goose && fail "goose directory kept after deselection" || pass "goose directory removed on deselection"
 
 echo "== fx deselection keeps its login"
@@ -305,7 +333,7 @@ log_has 'Removing provider muse' && pass "removal logged" || fail "no removal lo
 docker exec "${C}" test -e /data/agents/bin/muse && fail "muse directory kept" || pass "muse directory (and its extra files) removed"
 docker exec "${C}" test -e /data/agents/bin/antigravity && fail "antigravity directory kept" || pass "antigravity directory removed"
 docker exec "${C}" test -f /data/home/.config/muse/auth.json && pass "muse login kept" || fail "muse login removed"
-expect_enabled muse=false antigravity=false fx=false goose=false
+expect_enabled muse=false antigravity=false fx=false goose=false hermes=false
 
 # The seam's local path skips the download; a file:// URL goes through the same
 # curl call as a vendor's https:// URL, without network access.
@@ -327,6 +355,17 @@ docker exec "${C}" test -e /data/agents/bin/fx && fail "a failed download left a
 docker exec "${C}" grep -q '^fx=' "${STAMP}" && fail "fx stamped after a failed download" || pass "fx not stamped after a failed download"
 run_hook '["fx"]' "PASEO_HA_TEST_SCRIPT_URL=file://${STUB_URL}"
 script_installed fx fx && pass "download retried on the next start" || fail "download not retried"
+run_hook '["pi"]'
+
+echo "== the install time cap applies to vendor installers; the variable overrides a provider's own cap"
+run_hook '["hermes"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}" STUB_SLOW=3 PASEO_HA_PROVIDER_INSTALL_TIMEOUT=1
+hook_rc_ok && pass "hook exits 0 after a timed-out vendor installer" || fail "hook exit"
+log_has 'ERROR.*hermes' && pass "timed-out vendor installer logged" || fail "timed-out vendor installer not logged"
+expect_enabled hermes=false
+docker exec "${C}" test -e /data/agents/bin/hermes && fail "a timed-out install left its directory behind" || pass "a timed-out install left nothing behind"
+run_hook '["hermes"]' "PASEO_HA_TEST_SCRIPT_URL=${STUB_URL}" STUB_SLOW=3
+docker exec "${C}" test -x "${HERMES_CLI}/hermes" && pass "a slow installer within its cap completes" || fail "slow hermes install did not complete"
+expect_enabled hermes=true
 run_hook '["pi"]'
 
 echo "== a failing script install: disabled, logged, retried next start"

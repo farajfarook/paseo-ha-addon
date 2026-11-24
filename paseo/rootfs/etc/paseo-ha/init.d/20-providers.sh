@@ -10,15 +10,15 @@
 #     directories are never touched. No provider is baked into the image; Pi is
 #     installed here like the rest. A provider is installed either from npm (the
 #     default) or by its vendor's installer script (`PROVIDER_KIND` = script),
-#     because Muse Code, Antigravity, fx and goose are not published to npm
-#     (goose's npm package only carries a glibc binary, which the Alpine image
-#     cannot run).
+#     because Muse Code, Antigravity, fx, goose and Hermes are not published to
+#     npm (goose's npm package only carries a glibc binary, which the Alpine
+#     image cannot run).
 #  2. Set agents.providers.<id>.enabled in the persisted Paseo config for all
-#     ten providers: true only if the provider is selected and its CLI runs.
+#     eleven providers: true only if the provider is selected and its CLI runs.
 #     Paseo resolves the providers its bundled plugins register through the same
 #     per-provider override, so one mechanism covers both kinds. A plugin
-#     provider that Paseo only registers once it is configured (fx, goose) is
-#     registered by that override too, enabled or not.
+#     provider that Paseo only registers once it is configured (fx, goose,
+#     hermes) is registered by that override too, enabled or not.
 #
 # - Each start looks up `<package>@latest` in the npm registry. A prerelease on
 #   the latest tag is ignored. PACKAGE_HOLD pins a package instead of the lookup.
@@ -36,9 +36,10 @@
 #   not downloaded again. A newer release is tried normally. Script providers have
 #   no version to blame, so they are only ever retried.
 # - Failures are logged per provider and never abort startup. Each install is capped
-#   at PASEO_HA_PROVIDER_INSTALL_TIMEOUT seconds (default 600) and each --version
-#   check at 60 s, so a hung registry, install script or CLI counts as a failure
-#   instead of blocking the daemon.
+#   at PASEO_HA_PROVIDER_INSTALL_TIMEOUT seconds (default 600; a script provider
+#   may have a longer cap of its own in SCRIPT_TIMEOUT, which the variable
+#   overrides when set) and each --version check at 60 s, so a hung registry,
+#   install script or CLI counts as a failure instead of blocking the daemon.
 # - Test seams: PASEO_HA_TEST_FAIL_INSTALL="id,id" makes those installs fail;
 #   PASEO_HA_TEST_FAIL_SPEC="name@ver,..." makes installs of those exact specs fail;
 #   PASEO_HA_TEST_LATEST="name=ver,..." replaces the registry lookup for those
@@ -54,9 +55,10 @@ BIN_DIR="${AGENTS_DIR}/node_modules/.bin"
 SCRIPT_DIR="${AGENTS_DIR}/bin"
 LOOKUP_TIMEOUT="${PASEO_HA_PROVIDER_LOOKUP_TIMEOUT:-20}"   # seconds per package
 INSTALL_TIMEOUT="${PASEO_HA_PROVIDER_INSTALL_TIMEOUT:-600}"  # seconds per provider install (npm and its scripts)
+INSTALL_TIMEOUT_SET="${PASEO_HA_PROVIDER_INSTALL_TIMEOUT:+1}"  # set: that cap applies to every provider
 
 # Every provider Paseo supports, in `providers` option order.
-ALL_PROVIDERS=(claude codex copilot opencode pi omp muse antigravity fx goose)
+ALL_PROVIDERS=(claude codex copilot opencode pi omp muse antigravity fx goose hermes)
 
 # npm packages per provider (space separated, the CLI's own package last).
 # Only used for npm-installed providers; a script provider has no package.
@@ -80,6 +82,7 @@ declare -A PROVIDER_BIN=(
   [antigravity]="agy"
   [fx]="fx"
   [goose]="goose"
+  [hermes]="hermes"
 )
 # Install path per provider: "npm" (the default) or "script" (vendor installer).
 declare -A PROVIDER_KIND=(
@@ -87,6 +90,7 @@ declare -A PROVIDER_KIND=(
   [antigravity]="script"
   [fx]="script"
   [goose]="script"
+  [hermes]="script"
 )
 # Where the CLI lives. npm providers share the npm bin dir; a script provider gets
 # a directory of its own, so uninstalling it removes exactly the files the vendor
@@ -96,6 +100,14 @@ declare -A PROVIDER_BIN_DIR=(
   [antigravity]="${SCRIPT_DIR}/antigravity"
   [fx]="${SCRIPT_DIR}/fx"
   [goose]="${SCRIPT_DIR}/goose"
+  [hermes]="${SCRIPT_DIR}/hermes"
+)
+# The CLI's directory inside the provider directory, when it is not the provider
+# directory itself. Hermes' installer clones its source checkout (into
+# hermes-agent, so its staging directory stays inside the provider directory too)
+# and publishes the command in the checkout's .hermes/bin.
+declare -A PROVIDER_CLI_SUBDIR=(
+  [hermes]="hermes-agent/.hermes/bin"
 )
 # Vendor installers for the script providers: the installer is downloaded and run
 # once into the provider's own directory, and the CLI updates itself afterwards.
@@ -104,9 +116,12 @@ declare -A SCRIPT_URL=(
   [antigravity]="https://antigravity.google/cli/install.sh"
   [fx]="https://fx.sh/setup.sh"
   [goose]="https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh"
+  [hermes]="https://hermes-agent.nousresearch.com/install.sh"
 )
 # Shell the vendor documents for running the installer, and the extra arguments and
 # environment variables that put it in our directory (the vendors disagree on how).
+# SCRIPT_ENV is handed to env(1) in front of the installer, so it can also unset a
+# variable with `-u NAME`.
 # Muse Code's installer is a bash script despite the documentation's `| sh`, and
 # Alpine's /bin/sh (busybox) would fail on it. fx's installer downloads a
 # statically linked binary (x86_64 and aarch64), so it runs on the musl images.
@@ -114,19 +129,38 @@ declare -A SCRIPT_URL=(
 # Alpine); CONFIGURE=false skips its interactive `goose configure` step. That
 # portable build has no `goose update`, so goose is updated by running its
 # installer again (DOCS.md).
+# Hermes' installer clones its source, then fetches uv, a musl Python, Node.js and
+# its locked Python dependencies into its own tool store under ~/.hermes (on
+# musl, from musllinux wheels). --non-interactive skips its setup prompts;
+# --skip-browser and --skip-computer-use leave out the Chromium and cua-driver
+# tools, which have no musl builds and no desktop to drive here. The HA base
+# image sets UV_EXTRA_INDEX_URL/PIP_EXTRA_INDEX_URL to Home Assistant's musllinux
+# wheel index, which breaks the installer's hash-locked `uv sync` (uv only takes
+# a package from the first index that has it), so the installer runs without
+# them (`env -u`). `hermes update` isolates its own syncs and works with them set.
 declare -A SCRIPT_SHELL=(
   [muse]="bash"
   [antigravity]="bash"
   [fx]="bash"
   [goose]="bash"
+  [hermes]="bash"
 )
 declare -A SCRIPT_ARGS=(
   [antigravity]="--dir ${PROVIDER_BIN_DIR[antigravity]}"
+  [hermes]="--dir ${PROVIDER_BIN_DIR[hermes]}/hermes-agent --non-interactive --skip-browser --skip-computer-use"
 )
 declare -A SCRIPT_ENV=(
   [muse]="MUSE_INSTALL_DIR=${PROVIDER_BIN_DIR[muse]}"
   [fx]="FX_INSTALL_DIR=${PROVIDER_BIN_DIR[fx]}"
   [goose]="GOOSE_BIN_DIR=${PROVIDER_BIN_DIR[goose]} CONFIGURE=false"
+  [hermes]="-u UV_EXTRA_INDEX_URL -u PIP_EXTRA_INDEX_URL"
+)
+# Install time cap per script provider, in seconds, when it needs more than
+# INSTALL_TIMEOUT. Hermes downloads ~1 GB of runtime and dependencies and builds
+# its terminal and web UIs on first install (about 2 minutes on a fast x86_64
+# host; slower hosts and connections take longer).
+declare -A SCRIPT_TIMEOUT=(
+  [hermes]=1800
 )
 # Maintainer hold: package name -> exact version installed instead of `latest`.
 # Empty by default. Use it when a new agent release breaks with the pinned Paseo.
@@ -174,8 +208,19 @@ in_csv() { [[ ",$2," == *",$1,"* ]]; }
 # provider_is_script <id> -> true when the CLI comes from a vendor installer.
 provider_is_script() { [[ "${PROVIDER_KIND[$1]:-npm}" == "script" ]]; }
 
-# provider_bin_dir <id> -> the directory the provider's CLI lives in.
+# provider_bin_dir <id> -> the provider's own directory (npm providers share the
+# npm bin dir). A script provider's directory is emptied before its installer
+# runs and removed on deselection.
 provider_bin_dir() { printf '%s' "${PROVIDER_BIN_DIR[$1]:-${BIN_DIR}}"; }
+
+# provider_cli_dir <id> -> the directory the provider's CLI lives in: the
+# provider directory, or a subdirectory of it (PROVIDER_CLI_SUBDIR).
+provider_cli_dir() {
+  local dir
+  dir="$(provider_bin_dir "$1")"
+  [[ -n "${PROVIDER_CLI_SUBDIR[$1]:-}" ]] && dir+="/${PROVIDER_CLI_SUBDIR[$1]}"
+  printf '%s' "${dir}"
+}
 
 # npm_uninstall <specs...> -> remove the packages (names only), quietly.
 npm_uninstall() {
@@ -187,18 +232,19 @@ npm_uninstall() {
 # provider_bin <id> -> prints the CLI path when it is installed, else fails.
 provider_bin() {
   local bin
-  bin="$(provider_bin_dir "$1")/${PROVIDER_BIN[$1]}"
+  bin="$(provider_cli_dir "$1")/${PROVIDER_BIN[$1]}"
   [[ -x "${bin}" ]] || return 1
   printf '%s' "${bin}"
 }
 
 # provider_version <id> -> prints the CLI's first --version line (fails when the
 # CLI is missing, exits non-zero or prints nothing). The provider's own directory
-# goes first on PATH: an npm CLI wrapper looks up its runtime (bun, node) there.
+# directory goes first on PATH: an npm CLI wrapper looks up its runtime (bun, node)
+# there.
 provider_version() {
   local bin out
   bin="$(provider_bin "$1")" || return 1
-  out="$(timeout -k 5 60 env PATH="$(provider_bin_dir "$1"):${PATH}" "${bin}" --version 2>/dev/null)" || return 1
+  out="$(timeout -k 5 60 env PATH="$(provider_cli_dir "$1"):${PATH}" "${bin}" --version 2>/dev/null)" || return 1
   # The first non-blank line, without surrounding blanks: goose prints its version
   # with a leading space.
   out="$(printf '%s\n' "${out}" | grep -m1 '[^[:space:]]')" || return 1
@@ -267,10 +313,12 @@ install_specs() {
 # only counts against it when the CLI does not run afterwards: a vendor's
 # post-install step failing must not turn into a reinstall loop. Output in $log.
 install_script() {
-  local id="$1" url shell installer workdir rc
+  local id="$1" url shell installer workdir rc cap
   in_csv "${id}" "${PASEO_HA_TEST_FAIL_INSTALL:-}" && { echo "test seam: ${id} fails" >"${log}"; return 1; }
   url="${PASEO_HA_TEST_SCRIPT_URL:-${SCRIPT_URL[${id}]}}"
   shell="${SCRIPT_SHELL[${id}]}"
+  cap="${INSTALL_TIMEOUT}"
+  [[ -z "${INSTALL_TIMEOUT_SET}" && -n "${SCRIPT_TIMEOUT[${id}]:-}" ]] && cap="${SCRIPT_TIMEOUT[${id}]}"
 
   rm -rf "$(provider_bin_dir "${id}")"
   mkdir -p "$(provider_bin_dir "${id}")"
@@ -293,7 +341,7 @@ install_script() {
   # failure.
   workdir="$(mktemp -d)"
   # shellcheck disable=SC2086  # args is a space-separated list from SCRIPT_ARGS
-  (cd "${workdir}" && env ${SCRIPT_ENV[${id}]:-} timeout -k 10 "${INSTALL_TIMEOUT}" "${shell}" "${installer}" ${SCRIPT_ARGS[${id}]:-}) >"${log}" 2>&1
+  (cd "${workdir}" && env ${SCRIPT_ENV[${id}]:-} timeout -k 10 "${cap}" "${shell}" "${installer}" ${SCRIPT_ARGS[${id}]:-}) >"${log}" 2>&1
   rc=$?
   rm -rf "${installer}" "${workdir}"
 
@@ -331,7 +379,7 @@ for id in "${ALL_PROVIDERS[@]}"; do
   if provider_is_script "${id}"; then
     # The daemon (and agents) find the CLI through PATH; the directory only exists
     # while the provider is selected.
-    ph_env_prepend_path "$(provider_bin_dir "${id}")"
+    ph_env_prepend_path "$(provider_cli_dir "${id}")"
     if provider_runs "${id}"; then
       version_seen="$(provider_version "${id}")"
       NEW_STAMP["${id}"]="${PROVIDER_BIN[${id}]}@${version_seen}"

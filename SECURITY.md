@@ -28,7 +28,7 @@ Out of scope here, report upstream instead:
 
 - Paseo itself: <https://github.com/getpaseo/paseo/security>.
 - The agent CLIs (Claude Code, Codex, Copilot, OpenCode, Pi, Oh My Pi, Muse
-  Code, Antigravity, fx, goose) and their vendors.
+  Code, Antigravity, fx, goose, Hermes) and their vendors.
 - Home Assistant Supervisor / Core.
 
 ## Threat model

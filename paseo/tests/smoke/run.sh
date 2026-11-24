@@ -21,6 +21,8 @@
 #      a program in a Paseo terminal keeps running across `paseo daemon
 #      restart` and across a SIGKILL crash of the supervisor and daemon (s6
 #      restarts them), and the new daemon lists its terminal with its output
+#   g) without `hermes` in providers, the hermes-gateway service starts nothing
+#      and is not restarted
 #
 # Usage: run.sh <image>
 # Env:   SMOKE_PREFIX   name prefix for containers/network (default paseo-smoke)
@@ -304,6 +306,17 @@ else fail "f) terminal across paseo daemon restart (listed/alive/output): ${term
 if [[ "${term_out}" == *"crash=yes/yes/yes"* ]]; then
   pass "f) a terminal program keeps running across a daemon crash, listed with its output"
 else fail "f) terminal across a daemon crash (listed/alive/output): ${term_out}"; fi
+
+# --- g) the Hermes gateway only runs while hermes is selected -------------------------
+# The smoke options select only pi, so the service's run script finds no `hermes` CLI,
+# exits, and its finish script stops s6 from restarting it.
+hermes_svc="$(docker exec "${ADDON}" s6-svstat -o up,wantedup /run/service/hermes-gateway 2>&1 || true)"
+if [[ "${hermes_svc}" == "false false" ]]; then
+  pass "g) hermes-gateway is down and not restarted without hermes selected"
+else fail "g) hermes-gateway state (up wantedup): ${hermes_svc}"; fi
+if docker logs "${ADDON}" 2>&1 | grep -q 'Starting the Hermes gateway'; then
+  fail "g) the Hermes gateway was started without hermes selected"
+else pass "g) no Hermes gateway start without hermes selected"; fi
 
 if [[ "${FAILED}" -ne 0 ]]; then
   log "Smoke test FAILED"
