@@ -1,0 +1,115 @@
+## MODIFIED Requirements
+
+### Requirement: Provider selection option
+The add-on SHALL expose one multi-select `providers` option on its Configuration tab. Its values are exactly the agent provider IDs of the pinned Paseo: its built-in providers `claude`, `codex`, `copilot`, `opencode`, `pi` and `omp` (Oh My Pi), plus the providers its bundled plugins register, `muse` (Muse Code), `antigravity` (Antigravity), `fx` (fx, from Paseo 0.16.0), `goose` (goose, from Paseo 0.17.0) and `hermes` (Hermes Agent, from Paseo 0.17.4). Providers the owner deliberately excludes SHALL NOT be offered: `hoplite` (Hoplite, a sponsored plugin provider bundled from Paseo 0.11.3). An excluded provider SHALL be a plugin provider that Paseo only registers once it is configured, and the add-on SHALL never install its CLI or write its per-provider override. A supported plugin provider that Paseo only registers once it is configured (`fx`, `goose`, `hermes`) SHALL be registered through the same per-provider override the add-on writes for every supported provider, so it needs no setup in Paseo's own provider catalog. The default SHALL be `[pi]`.
+
+#### Scenario: Fresh install
+- **WHEN** the add-on is installed and started without changing its configuration
+- **THEN** the `providers` option holds only `pi`, and Pi is the only provider Paseo offers
+
+#### Scenario: Same list as Paseo
+- **WHEN** the user opens the add-on Configuration tab
+- **THEN** the `providers` option offers every provider the pinned Paseo can run except the excluded ones, and no others, and CI fails when the option and the pinned Paseo's provider list (minus the excluded providers) disagree
+
+#### Scenario: Plugin provider offered
+- **WHEN** the pinned Paseo registers a provider from one of its bundled plugins and that provider is not excluded
+- **THEN** that provider appears in the `providers` option like a built-in one
+
+#### Scenario: Plugin provider that needs configuration
+- **WHEN** `providers` includes `fx`, `goose` or `hermes`, that CLI is usable and the add-on starts
+- **THEN** the add-on writes that provider's per-provider override, Paseo registers and offers it without the user adding it from Paseo's provider catalog, and when it is not selected the override marks it disabled
+
+#### Scenario: Excluded provider not offered
+- **WHEN** the pinned Paseo bundles the Hoplite plugin provider and the add-on starts with any `providers` value
+- **THEN** `hoplite` is not a value of the `providers` option, no Hoplite CLI is installed, and Paseo does not offer Hoplite
+
+#### Scenario: Excluded provider would appear on its own
+- **WHEN** a new pinned Paseo makes an excluded provider built in, or registers it without requiring configuration
+- **THEN** CI fails the provider check, because Paseo would offer that provider without the add-on enabling it
+
+#### Scenario: Invalid value rejected
+- **WHEN** the user saves a `providers` value that is not one of the known IDs
+- **THEN** Home Assistant rejects the configuration before the add-on starts
+
+### Requirement: Paseo providers follow the selection
+On each start, before the daemon serves clients, the add-on SHALL turn on in Paseo every selected provider whose CLI is usable, and SHALL turn off every other supported provider. The add-on's selection SHALL override changes made in Paseo's settings.
+
+#### Scenario: Enabled providers match the selection
+- **WHEN** `providers` is `[pi, claude]` and both CLIs are usable
+- **THEN** Paseo offers Pi and Claude and marks Codex, Copilot, OpenCode, Oh My Pi, Muse Code, Antigravity, fx, goose and Hermes as disabled
+
+#### Scenario: Plugin provider enabled
+- **WHEN** `providers` is `[muse]` and the `muse` CLI is usable
+- **THEN** Paseo offers Muse Code, using the same per-provider enable setting as a built-in provider
+
+#### Scenario: All providers deselected
+- **WHEN** `providers` is empty and the add-on starts
+- **THEN** Paseo starts and marks every supported provider as disabled
+
+#### Scenario: Toggle in Paseo is overridden
+- **WHEN** the user enables a deselected provider in Paseo's settings and then restarts the add-on
+- **THEN** that provider is disabled again
+
+### Requirement: Vendor-installed providers
+The add-on SHALL install a selected provider whose CLI is not published to npm, or only in a form the add-on's Alpine (musl) image cannot run (goose ships a glibc binary), with the vendor's own installer, into a directory of its own under persistent storage, with the directory that holds its CLI (the provider directory, or a subdirectory of it where the vendor's installer puts the command, as Hermes' does in its source checkout) on the agents' PATH. It SHALL NOT look such a provider up in the npm registry, and SHALL NOT download anything for one whose CLI already answers its version check. It SHALL record and log the version that CLI reports, without surrounding blanks. Upgrade of such a provider is the CLI's own responsibility; where the vendor's build for the add-on's image cannot update itself (goose's musl build has no `goose update`), running the vendor's installer again into the same directory updates it, and the next start records the new version. The vendor's installer SHALL run in a scratch working directory that is removed afterwards, and SHALL NOT be allowed to prompt (goose's interactive `goose configure` step and Hermes' setup steps are turned off). Where an environment variable of the add-on's base image breaks a vendor's installer, the installer SHALL run without it (Hermes' installer runs without Home Assistant's `UV_EXTRA_INDEX_URL` and `PIP_EXTRA_INDEX_URL`). A vendor installer SHALL be stopped after the add-on's install time cap: 600 seconds by default, longer for a provider whose first install downloads and builds much more (Hermes: 1800 seconds); `PASEO_HA_PROVIDER_INSTALL_TIMEOUT` overrides the cap for every provider.
+
+#### Scenario: Install on selection
+- **WHEN** the user adds `muse` to `providers` and restarts the add-on
+- **THEN** the Muse Code installer runs into `/data/agents/bin/muse`, `muse --version` succeeds there, and the `Providers:` log line names the reported version
+
+#### Scenario: Install goose
+- **WHEN** the user adds `goose` to `providers` and restarts the add-on
+- **THEN** goose's installer runs non-interactively into `/data/agents/bin/goose` and installs its musl build, `goose --version` succeeds there, the `Providers:` log line names the version without the leading space goose prints, and nothing the installer downloaded is left in a working directory
+
+#### Scenario: goose updated by its installer
+- **WHEN** the user runs goose's installer again into `/data/agents/bin/goose` and restarts the add-on
+- **THEN** nothing is downloaded by the add-on and the `Providers:` log line names the new version
+
+#### Scenario: Install Hermes
+- **WHEN** the user adds `hermes` to `providers` and restarts the add-on
+- **THEN** Hermes' installer runs non-interactively, without its browser and computer-use tools and without the base image's extra Python package index, cloning Hermes into `/data/agents/bin/hermes/hermes-agent` and keeping its runtime under `/data/home/.hermes`; `hermes --version` succeeds from the checkout's `.hermes/bin`, that directory is on the agents' PATH, and the `Providers:` log line names the first line of the version Hermes reports
+
+#### Scenario: Hermes updated with hermes update
+- **WHEN** the user runs `hermes update` in a Paseo terminal and later restarts the add-on
+- **THEN** nothing is downloaded by the add-on and the `Providers:` log line names the new version
+
+#### Scenario: Deselect Hermes
+- **WHEN** the user removes `hermes` from `providers` and restarts the add-on
+- **THEN** `/data/agents/bin/hermes` is removed, and `/data/home/.hermes` (Hermes' settings, sessions and runtime) is kept
+
+#### Scenario: Already installed
+- **WHEN** the add-on restarts with a provider whose CLI already answers its version check, even after that CLI has updated itself
+- **THEN** nothing is downloaded for it and the log line names the version the CLI now reports
+
+#### Scenario: Nothing downloaded when not selected
+- **WHEN** the add-on starts with `providers` set to `[pi]`
+- **THEN** no vendor installer is fetched and no second provider directory is created
+
+#### Scenario: Installer times out or is refused
+- **WHEN** the vendor's installer fails, times out, or its CLI does not run afterwards
+- **THEN** the add-on log shows the failure, Paseo starts with that provider disabled, and the next start tries again
+
+#### Scenario: Installer exits non-zero after installing
+- **WHEN** the vendor's installer exits non-zero but its CLI answers its version check afterwards
+- **THEN** the add-on treats the provider as installed and enabled, logs the exit code, and does not reinstall it on the next start
+
+## ADDED Requirements
+
+### Requirement: Hermes gateway runtime
+While `hermes` is selected and its CLI is installed, the add-on SHALL run and supervise Hermes' gateway runtime itself (in the foreground, declared as externally supervised), so that Hermes clients attach to it instead of starting one through the container's s6 supervisor. It SHALL restart the gateway when `hermes update` hands it back. Without `hermes` selected and installed it SHALL run no gateway and SHALL NOT retry. The gateway's logging SHALL stay in Hermes' own log directory.
+
+#### Scenario: Hermes agent starts
+- **WHEN** `hermes` is selected and installed, a model provider is configured for Hermes, and the user starts a Hermes agent in Paseo
+- **THEN** the agent session starts and the turn reaches the configured model provider
+
+#### Scenario: Paseo lists Hermes as available
+- **WHEN** `hermes` is selected and installed and the add-on has started
+- **THEN** Paseo lists Hermes as enabled and available, with Hermes' modes
+
+#### Scenario: Gateway restarted after hermes update
+- **WHEN** the user runs `hermes update` in a Paseo terminal and a newer Hermes is installed
+- **THEN** the gateway is restarted on the new code without an add-on restart, and the next Hermes agent turn works
+
+#### Scenario: No gateway without Hermes
+- **WHEN** the add-on starts with `providers` that do not include `hermes`
+- **THEN** no Hermes gateway process runs, the gateway service is not restarted, and the add-on log does not show a gateway start
