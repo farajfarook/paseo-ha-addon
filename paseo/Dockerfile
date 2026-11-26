@@ -9,7 +9,7 @@ ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 # node-gyp).
 # ---------------------------------------------------------------------------
 FROM ${BUILD_FROM} AS build
-ARG PASEO_VERSION=0.17.4
+ARG PASEO_VERSION=0.17.5
 ENV ONNXRUNTIME_NODE_INSTALL=skip \
     npm_config_update_notifier=false \
     npm_config_fund=false \
@@ -44,7 +44,7 @@ RUN set -eu; \
 
 # Static GitHub CLI (`gh`) from cli/cli releases, verified against the release
 # checksums. Agents use it for GitHub and as git's HTTPS credential helper.
-ARG GH_CLI_VERSION=2.105.0
+ARG GH_CLI_VERSION=2.106.0
 RUN set -eu; \
     case "${BUILD_ARCH:-${TARGETARCH:-$(uname -m)}}" in \
       amd64|x86_64) arch=amd64 ;; \
@@ -65,7 +65,7 @@ RUN set -eu; \
 # Runtime image
 # ---------------------------------------------------------------------------
 FROM ${BUILD_FROM}
-ARG PASEO_VERSION=0.17.4
+ARG PASEO_VERSION=0.17.5
 ENV ONNXRUNTIME_NODE_INSTALL=skip \
     npm_config_update_notifier=false \
     npm_config_fund=false \
