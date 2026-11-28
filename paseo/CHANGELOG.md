@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.18.1-1
+
+- Bundled Paseo **0.18.1** (was 0.18.0). You can set host-wide instructions once to guide the language, tone and formatting of generated workspace titles, branch names, commit messages and pull requests, and Usage now shows Claude extra-usage spending and Codex individual spending limits with their reset times. Fixes include messages sent while Pi runs a turn it started itself queuing instead of failing, OpenCode v2 tool approvals no longer staying stuck, idle ACP agents (Antigravity, fx, goose, Hermes) reopening on the next message after their process exits instead of failing for good when the agent can resume its session, Mark as read on a workspace clearing finished terminal attention, Command Center results no longer reordering while you type, Kimi usage working for global `kimi.ai` accounts, and the Z.ai Usage card showing when GLM Agent is signed in with `Z_AI_API_KEY`.
+- Pi is not in the image: when it is selected in `providers` (the default), the add-on installs it on start at its latest stable release, like the other npm agents (Pi **1.7.0** when this version was released).
+
 ## 0.18.0-1
 
 - Bundled Paseo **0.18.0** (was 0.17.5), which includes 0.17.6. Each device can choose which agent, terminal and plugin events send it notifications, agent profiles can carry a system prompt for the agents started from them, syntax highlighting covers diff and patch files and many more languages, Settings is split into Device and Host sections, and the model picker can be used with the arrow keys. Antigravity, fx, goose and Hermes now keep their model lists across restarts (in `/data/home/.paseo/cache`) instead of probing for them in the background. Fixes include OpenCode v2 agents no longer staying Running after Stop, steering a Pi agent no longer aborting a run it started on its own, a workspace created from a pull request in a fork clone checking out the right pull request, worktrees staying inside the configured worktrees folder, and timelines no longer dropping rows.
